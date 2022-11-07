@@ -39,8 +39,8 @@ Created on Mon Oct 10
     
     # Echoing Time Series
     Mecho       -   number of steps to echo (value not stored explicitly in object)
-    rEcho      -   state of the autonomous reservoir
-    yEcho      -   prediction of the original dataset using the autonomous reservoir
+    rEcho       -   state of the autonomous reservoir
+    yEcho       -   prediction of the original dataset using the autonomous reservoir
     
     # Inference Time Series
     Minfer      -   number of steps to infer (value not stored explicitly in object)
@@ -53,6 +53,7 @@ Created on Mon Oct 10
 ## Dependencies ##
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 import numpy as np
+from scipy.linalg import eigvals as eigvals
 from scipy.sparse import random as sparseRandom
 from scipy.sparse import csr_matrix as sparseCsrMatrix
 from scipy.sparse.linalg import eigs as sparseEigs
@@ -249,6 +250,18 @@ class Reservoir():
         if i+1 == N:
             sys.stdout.write(f"\r{100*(i+1)/N:8.1f}%")
             sys.stdout.flush()
+
+    def calcEchoSR(self):  
+        if self.bias:
+            Anew = np.zeros((self.N+1,self.N+1))
+            Bnew = np.zeros((self.N+1,self.D  ))
+        else:
+            Anew = np.zeros((self.N  ,self.N  ))
+            Bnew = np.zeros((self.N  ,self.D  ))
+        Anew[:self.N,:self.N] = self.A.todense()
+        Bnew[:self.N,:self.D] = self.B.todense()
+        print(eigvals(Anew+Bnew@self.W-2*np.eye(Anew.shape[0])).max())
+        print(eigvals(Anew+Bnew@self.W).max())
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 ## mapRC subclass ##
