@@ -4,8 +4,8 @@ Created on Wed Oct 12 09:56:30 2022
 
 @author: Adrian Wong
 """
-%reload_ext autoreload
-%autoreload 2
+# %reload_ext autoreload
+# %autoreload 2
 
 import numpy as np
 import scipy as sp
@@ -47,7 +47,7 @@ def lorenz63(u,t,params):
 #%% generate data
 np.random.seed(11111)
 D = 3
-N = 250
+N = 50
 
 M = 10000
 Mpred = 10000
@@ -72,10 +72,11 @@ xPred = forwardInt(Mpred,xPred,t,dt,lorenz63,params)
 yPred = xPred+np.random.normal(loc=0.0,scale=1,size=xPred.shape)
 #%% standard RC usage
 np.random.seed(11111)
-RC = mapRC(N,D,bias=False)
-
 rho = 0.9
 sigma = 0.1
+
+RC = mapRC(N,D,bias=True)
+
 RC.makeConnectionMat(rho,loc=-1,scale=2)
 RC.makeInputMat(sigma,randMin=0,randMax=1)
 
@@ -87,20 +88,40 @@ RC.echo(Mpred)
 
 driveIndex =[1]
 RC.infer(yPred[driveIndex],driveIndex)
-
+#%%
 plt.rcParams.update({'font.size': 16})
-plt.rcParams['figure.figsize'] = [15, 3]
+plt.rcParams['figure.figsize'] = [15, 10]
+fig,axs = plt.subplots(3,sharex='col')
+fig.subplots_adjust(hspace=0)
+labelList = ['x','y','z']
 for i in range(D):
-    plt.plot(yPred[i,:Mplot],label='data')
-    plt.plot(RC.yEcho[i,:Mplot],label='echo')
-    plt.plot(RC.yInfer[i,:Mplot],label='infer')
-    plt.legend(loc='upper right')
-    plt.show()
+    axs[i].plot(yPred[i,:Mplot],label='data')
+    axs[i].plot(RC.yEcho[i,:Mplot],label='echo')
+    axs[i].plot(RC.yInfer[i,:Mplot],label='infer')
+    axs[i].set_xlabel('steps')
+    axs[i].set_yticks([])
+    axs[i].set_ylabel(labelList[i])
+axs[0].legend(loc='upper right')
+axs[0].set_title('Prediction Window')
+plt.show()
 
 
 plt.rcParams['figure.figsize'] = [8, 8]
-plt.plot(xPred[0],xPred[1],'.')
-plt.plot(RC.yEcho[0],RC.yEcho[1])
+plt.plot(xPred[0],xPred[1],label='data')
+plt.plot(RC.yEcho[0],RC.yEcho[1],label='echo')
+plt.plot(RC.yInfer[0],RC.yInfer[1],label='infer')
+plt.xlabel('x')
+plt.ylabel('y')
+plt.title('Attractors')
+plt.legend()
+plt.show()
+
+
+plt.rcParams['figure.figsize'] = [8, 8]
+plt.plot(yPred[0],RC.yInfer[0],',')
+plt.xlabel('data')
+plt.ylabel('infer')
+plt.title('Reconstruction')
 plt.show()
 
 # %%
