@@ -263,6 +263,12 @@ class Reservoir():
         print(eigvals(Anew+Bnew@self.W-2*np.eye(Anew.shape[0])).max())
         print(eigvals(Anew+Bnew@self.W).max())
 
+    def inferPC(self,y,start=0,end=-1):
+        D,M = y.shape
+        yy = y - np.swapaxes([np.mean(y,axis=1)],0,1)
+        yInfer = self.yInfer -np.swapaxes([np.mean(self.yInfer,axis=1)],0,1)
+        return (yInfer@yy.T)**2/((yInfer@yInfer.T)*(yy@yy.T))
+
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 ## mapRC subclass ##
 The mapRC subclass inherits the Reservoir class structure.

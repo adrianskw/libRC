@@ -117,12 +117,12 @@ plt.title('Attractors')
 plt.legend()
 plt.show()
 
-
+PCmat = RC.inferPC(yPred)
 plt.rcParams['figure.figsize'] = [8, 8]
 plt.plot(yPred[0],RC.yInfer[0],',')
 plt.xlabel('data')
 plt.ylabel('infer')
-plt.title('Reconstruction')
+plt.title(f'Reconstruction PC = {PCmat[0,0]:0.3f}')
 plt.show()
 
 # %%
