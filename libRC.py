@@ -55,6 +55,7 @@ Created on Mon Oct 10
 import numpy as np
 from scipy.linalg import eigvals as eigvals
 from scipy.sparse import random as sparseRandom
+from scipy.optimize import fsolve as fsolve
 from scipy.sparse import csr_matrix as sparseCsrMatrix
 from scipy.sparse.linalg import eigs as sparseEigs
 from scipy.stats import uniform as statsUniform
@@ -99,21 +100,21 @@ class Reservoir():
         self.yEcho      = None
 
 # Setup Functions for Matrices
-    def makeConnectionMat(self,rho,density=0.02,zeroDiag=True,dist=statsUniform,loc=-1.0,scale=2.0):
+    def makeConnectionMat(self,rho,density=0.02,zeroDiag=False,dist=statsUniform,loc=-1.0,scale=2.0):
         # dist options: stats.uniform or stats.normal
         # default is uniform in range [-1,1), otherwise [loc,loc+scale)
         # normal distribution is N(loc,scale)
         self.rho = rho
         self.density = density
-        A = sparseRandom(self.N, self.N, density = self.density, data_rvs = dist(loc=loc, scale=scale).rvs)
+        self.A = sparseRandom(self.N, self.N, density = self.density, data_rvs = dist(loc=loc, scale=scale).rvs)
         # zero diagonal option
         if zeroDiag:
-            A.setdiag(0)
-            A.eliminate_zeros()
+            self.A.setdiag(0)
+            self.A.eliminate_zeros()
         # find spectral radius, i.e. Largest Magnitude (LM) eigenvalue
-        maxEig = np.abs(sparseEigs(A, k = 1, which='LM', return_eigenvectors=False))
+        maxEig = np.abs(sparseEigs(self.A, k = 1, which='LM', return_eigenvectors=False))
         # rescale to specified spectral radius
-        self.A = A.multiply(self.rho/maxEig)
+        self.A = self.A.multiply(self.rho/maxEig)
         print("Connection matrix is setup.")
 
     def makeInputMat(self,sigma,sparseFlag=True,randMin=-0.0,randMax=1.0):
@@ -233,6 +234,57 @@ class Reservoir():
         # wall time
         print(f"\nInference phase completed. Time taken: {time.time()-startTime:.3} seconds.")
         print('-----------------------------------------------------------------')
+
+    def infer2(self,yDrive,driveIndex,measInterval,randFlag=False,randMin=-10,randMax=10):
+        # check for exception
+        if yDrive.shape[0]!=len(driveIndex):
+            raise Exception('Shape of driving data does not match the number of drive variables.')
+        # starting timer
+        print("Inference 2 phase in progress...")
+        startTime = time.time()
+        # establish rInfer
+        Minfer = yDrive.shape[1]
+        self.infer2Setup(Minfer,randFlag,randMin,randMax)
+        # inferring main loop
+        for i in range(1,Minfer):
+            # placeholder vector
+            yTemp = self.W@self.rInfer2[:,i-1]
+            self.rInfer2[:self.N,i] = self.step(self.rInfer2[:self.N,i-1],yTemp)
+            if i%measInterval==0:
+                # replacing measured variables with data
+                yTemp[driveIndex] = np.copy(yDrive[:,i-1])
+                self.rInfer2[:self.N,i] = self.step(self.rInfer2[:self.N,i-1],yTemp)
+            self.progressBar(i,Minfer)
+        self.yInfer2 = self.W@self.rInfer2
+        # wall time
+        print(f"\nInference 2 phase completed. Time taken: {time.time()-startTime:.3} seconds.")
+        print('-----------------------------------------------------------------')
+
+    def inferImplicit(self,yDrive,driveIndex,measInterval,randFlag=False,randMin=-10,randMax=10):
+        # check for exception
+        if yDrive.shape[0]!=len(driveIndex):
+            raise Exception('Shape of driving data does not match the number of drive variables.')
+        # starting timer
+        print("Inference Implicit phase in progress...")
+        startTime = time.time()
+        # establish rInfer
+        Minfer = yDrive.shape[1]
+        self.inferImplicitSetup(Minfer,randFlag,randMin,randMax)
+        # inferring main loop
+        rTemp = self.rInferImplicit[:,0]
+        for i in range(1,Minfer):
+            # placeholder vector
+            yTemp = self.W@self.rInferImplicit[:,i-1]
+            self.rInferImplicit[:self.N,i] = self.step(self.rInferImplicit[:self.N,i-1],yTemp)
+            if i%measInterval==0:
+                # replacing measured variables with data
+                self.rInferImplicit[:self.N,i] = fsolve(self.consistencyImplicit,self.rInferImplicit[:self.N,i],
+                args=(yDrive[:,i],driveIndex))
+            self.progressBar(i,Minfer)
+        self.yInferImplicit = self.W@self.rInferImplicit
+        # wall time
+        print(f"\nInference 2 phase completed. Time taken: {time.time()-startTime:.3} seconds.")
+        print('-----------------------------------------------------------------')
     
     def inferSetup(self,Minfer,randFlag,randMin,randMax):
         self.rInfer = np.ones((self.r.shape[0],Minfer))
@@ -241,10 +293,39 @@ class Reservoir():
         if randFlag == True:
             print("Perturbing Reservoir States...")
             self.rInfer[:self.N,0] += np.random.uniform(low=randMin,high=randMax,size=self.N)
+
+    def infer2Setup(self,Minfer,randFlag,randMin,randMax):
+        self.rInfer2 = np.ones((self.r.shape[0],Minfer))
+        self.rInfer2[:self.N,0] = self.step(self.r[:self.N,-1],self.W@self.r[:,-1])
+        # randFlag for testing sychronization
+        if randFlag == True:
+            print("Perturbing Reservoir States...")
+            self.rInfer2[:self.N,0] += np.random.uniform(low=randMin,high=randMax,size=self.N)
+
+    def inferImplicitSetup(self,Minfer,randFlag,randMin,randMax):
+        self.rInferImplicit = np.ones((self.r.shape[0],Minfer))
+        self.rInferImplicit[:self.N,0] = self.step(self.r[:self.N,-1],self.W@self.r[:,-1])
+        # randFlag for testing sychronization
+        if randFlag == True:
+            print("Perturbing Reservoir States...")
+            self.rInferImplicit[:self.N,0] += np.random.uniform(low=randMin,high=randMax,size=self.N)
             
 # Miscellaneous Function
+    # def consistencyImplicit(self,rTemp,rTemp2,yTemp):
+    #     return rTemp2-self.step(rTemp,self.W@rTemp)
+
+    def consistencyImplicit(self,rTemp,yDrive,driveIndex):
+        if self.bias:
+            yTemp = self.W@np.hstack((rTemp,1))
+            yTemp[driveIndex] = np.copy(yDrive)
+            return self.step(rTemp[:self.N],yTemp)-self.step(rTemp[:self.N],self.W@np.hstack((rTemp,1)))
+        else:
+            yTemp = self.W@rTemp
+            yTemp[driveIndex] = np.copy(yDrive)
+            return self.step(rTemp,yTemp)-self.step(rTemp,self.W@rTemp)
+
     def progressBar(self,i,N):  
-        if i%617 == 0:
+        if i%62 == 0:
             sys.stdout.write(f"\r{100*(i+1)/N:8.1f}%")
             sys.stdout.flush()
         if i+1 == N:
