@@ -77,7 +77,7 @@ sigma = 0.1
 
 RC = mapRC(N,D,bias=True)
 
-RC.makeConnectionMat(rho,loc=-1,scale=2)
+RC.makeConnectionMat(rho,density=0.02,loc=-1,scale=2)
 RC.makeInputMat(sigma,randMin=0,randMax=1)
 
 # RC.A = sp.sparse.eye(N)
@@ -87,8 +87,8 @@ RC.train(y,alpha=0.01)
 RC.echo(Mpred)
 
 driveIndex =[1]
+
 RC.infer(yPred[driveIndex],driveIndex)
-#%%
 plt.rcParams.update({'font.size': 16})
 plt.rcParams['figure.figsize'] = [15, 10]
 fig,axs = plt.subplots(3,sharex='col')
@@ -136,5 +136,4 @@ Dnew = Cnew-np.eye(Cnew.shape[0])
 print('SR(A)\t\t', sp.linalg.eigvals(Anew).max())
 print('SR(B@W)\t\t', sp.linalg.eigvals(Bnew@RC.W).max())
 print('SR(A+B@W)\t', sp.linalg.eigvals(Cnew).max())
-print('SR(-1+A+B@W)\t', sp.linalg.eigvals(Dnew).max())
 # %%
