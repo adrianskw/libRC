@@ -47,11 +47,10 @@ def lorenz63(u,t,params):
 #%% generate data
 np.random.seed(11111)
 D = 3
-N = 50
 
-M = 10000
-Mpred = 10000
-Mplot = 4000
+M = 30000
+Mpred = 4200
+Mplot = 4200
 dt = 0.01
 t = 0 # dummy variable
 
@@ -72,23 +71,48 @@ xPred = forwardInt(Mpred,xPred,t,dt,lorenz63,params)
 yPred = xPred+np.random.normal(loc=0.0,scale=1,size=xPred.shape)
 #%% standard RC usage
 np.random.seed(11111)
+N = 100
 rho = 0.9
 sigma = 0.1
 
+
+# ds = 0.3
+# RC = diffRC(N,D,ds,bias=True)
+# RC.chooseIntegrator('RK2')
+
 RC = mapRC(N,D,bias=True)
 
-RC.makeConnectionMat(rho,density=0.02,loc=-1,scale=2)
+RC.makeConnectionMat(rho,loc=-1,scale=2)
 RC.makeInputMat(sigma,randMin=0,randMax=1)
 
 # RC.A = sp.sparse.eye(N)
 
 RC.listen(y)
-RC.train(y,alpha=0.01)
+RC.train(y,alpha=0.1)
 RC.echo(Mpred)
 
-driveIndex =[1]
-
+driveIndex =[0,1,2]
+measInterval = 20
 RC.infer(yPred[driveIndex],driveIndex)
+RC.inferImplicit(yPred[driveIndex],driveIndex,measInterval)
+
+plt.rcParams['figure.figsize'] = [15, 3]
+plt.plot(xPred[0,:Mplot],'.')
+plt.plot(RC.yInferImplicit[0,:Mplot])
+plt.plot(RC.yInfer[0,:Mplot])
+plt.show()
+
+ticks = measInterval*(np.arange(int(Mpred/measInterval)))
+plt.semilogy(np.abs(yPred[0,:Mplot]-RC.yInferImplicit[0,:Mplot]))
+plt.semilogy(ticks,np.abs(yPred[0,:Mplot:measInterval]-RC.yInferImplicit[0,:Mplot:measInterval]),'.')
+plt.show()
+print(np.linalg.norm(yPred-RC.yInferImplicit)/M)
+
+plt.semilogy(np.linalg.norm(RC.rInfer[:,:Mplot]-RC.rInferImplicit[:,:Mplot],axis=0))
+plt.semilogy(ticks,np.linalg.norm(RC.rInfer[:,:Mplot:measInterval]-RC.rInferImplicit[:,:Mplot:measInterval],axis=0),'.')
+plt.show()
+print(np.linalg.norm(RC.rInfer-RC.rInferImplicit)/M)
+#%%
 plt.rcParams.update({'font.size': 16})
 plt.rcParams['figure.figsize'] = [15, 10]
 fig,axs = plt.subplots(3,sharex='col')
@@ -98,6 +122,7 @@ for i in range(D):
     axs[i].plot(yPred[i,:Mplot],label='data')
     axs[i].plot(RC.yEcho[i,:Mplot],label='echo')
     axs[i].plot(RC.yInfer[i,:Mplot],label='infer')
+    axs[i].plot(RC.yInferImplicit[i,:Mplot],label='implicit')
     axs[i].set_xlabel('steps')
     axs[i].set_yticks([])
     axs[i].set_ylabel(labelList[i])
@@ -110,6 +135,7 @@ plt.rcParams['figure.figsize'] = [8, 8]
 plt.plot(xPred[0],xPred[1],label='data')
 plt.plot(RC.yEcho[0],RC.yEcho[1],label='echo')
 plt.plot(RC.yInfer[0],RC.yInfer[1],label='infer')
+plt.plot(RC.yInferImplicit[0],RC.yInferImplicit[1],label='implicit')
 plt.xlabel('x')
 plt.ylabel('y')
 plt.title('Attractors')
@@ -118,9 +144,11 @@ plt.show()
 
 PCmat = RC.inferPC(yPred)
 plt.rcParams['figure.figsize'] = [8, 8]
-plt.plot(yPred[0],RC.yInfer[0],',')
+plt.plot(yPred[0],RC.yInferImplicit[0],',',label='implicit')
+plt.plot(yPred[0],RC.yInfer[0],',',label='infer')
 plt.xlabel('data')
 plt.ylabel('infer')
+plt.legend()
 plt.title(f'Reconstruction PC = {PCmat[0,0]:0.3f}')
 plt.show()
 
@@ -136,4 +164,5 @@ Dnew = Cnew-np.eye(Cnew.shape[0])
 print('SR(A)\t\t', sp.linalg.eigvals(Anew).max())
 print('SR(B@W)\t\t', sp.linalg.eigvals(Bnew@RC.W).max())
 print('SR(A+B@W)\t', sp.linalg.eigvals(Cnew).max())
+print('SR(-1+A+B@W)\t', sp.linalg.eigvals(Dnew).max())
 # %%
