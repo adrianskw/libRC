@@ -8,15 +8,11 @@ Created on Wed Oct 12 09:56:30 2022
 # %autoreload 2
 
 import numpy as np
-import scipy as sp
-from scipy import linalg
 import matplotlib.pyplot as plt
-import sys as sys
-sys.path.append('../')
+from sys import path as path
+path.append('../')
 from libRC import diffRC,mapRC
-
 plt.rcParams.update({'font.size': 16})
-plt.rcParams['figure.figsize'] = [15, 3]
 
 def RK4(y,t,dt,f,params):
     k1 = dt*f(y,t,params)
@@ -43,12 +39,11 @@ def lorenz63(u,t,params):
     dzdt = x*y - beta*z
     return np.asarray([dxdt,dydt,dzdt])
 
-
 #%% generate data
 np.random.seed(11111)
 D = 3
 
-M = 30000
+M = 50000
 Mpred = 4200
 Mplot = 4200
 dt = 0.01
@@ -75,48 +70,48 @@ N = 100
 rho = 0.9
 sigma = 0.1
 
-
-# ds = 0.3
-# RC = diffRC(N,D,ds,bias=True)
-# RC.chooseIntegrator('RK2')
-
-RC = mapRC(N,D,bias=True)
+mode = 'map'
+# mode = 'diff'
+if mode == 'map':
+    RC = mapRC(N,D,bias=True)
+elif mode == 'diff':
+    ds = 0.3
+    RC = diffRC(N,D,ds,bias=True)
+    RC.chooseIntegrator('RK2')
 
 RC.makeConnectionMat(rho,loc=-1,scale=2)
 RC.makeInputMat(sigma,randMin=0,randMax=1)
-
-# RC.A = sp.sparse.eye(N)
 
 RC.listen(y)
 RC.train(y,alpha=0.01)
 RC.echo(Mpred)
 
 driveIndex =[1]
-measInterval = 20
+measInterval = 15
 RC.infer(yPred[driveIndex],driveIndex)
 RC.infer2(yPred[driveIndex],driveIndex,measInterval)
 
-plt.rcParams['figure.figsize'] = [15, 3]
-plt.plot(xPred[0,:Mplot],'.')
-plt.plot(RC.yInfer2[0,:Mplot])
-plt.plot(RC.yEcho[0,:Mplot])
+plt.rcParams['figure.figsize'] = [15, 4]
+plt.plot(yPred[0,:Mplot],'.',label='data')
+# plt.plot(RC.yEcho[0,:Mplot],label='echo')
+plt.plot(RC.yInfer[0,:Mplot],label='infer')
+plt.plot(RC.yInfer2[0,:Mplot],label='infer2')
+plt.legend()
 plt.show()
 
 ticks = measInterval*(np.arange(int(Mpred/measInterval)))
-plt.semilogy(np.abs(yPred[0,:Mplot]-RC.yInfer2[0,:Mplot]))
-plt.semilogy(ticks,np.abs(yPred[0,:Mplot:measInterval]-RC.yInfer2[0,:Mplot:measInterval]),'.')
+plt.semilogy(np.abs(xPred[0,:Mplot]-RC.yInfer2[0,:Mplot]),label='infer2 error')
+plt.semilogy(ticks,np.abs(xPred[0,:Mplot:measInterval]-RC.yInfer2[0,:Mplot:measInterval]),'.')
 plt.show()
-print(np.linalg.norm(yPred-RC.yInfer2)/M)
 
 #%%
-plt.rcParams.update({'font.size': 16})
 plt.rcParams['figure.figsize'] = [15, 10]
 fig,axs = plt.subplots(3,sharex='col')
 fig.subplots_adjust(hspace=0)
 labelList = ['x','y','z']
 for i in range(D):
-    axs[i].plot(yPred[i,:Mplot],label='data')
-    axs[i].plot(RC.yEcho[i,:Mplot],label='echo')
+    axs[i].plot(yPred[i,:Mplot],'.',label='data')
+    # axs[i].plot(RC.yEcho[i,:Mplot],label='echo')
     axs[i].plot(RC.yInfer[i,:Mplot],label='infer')
     axs[i].plot(RC.yInfer2[i,:Mplot],label='infer2')
     axs[i].set_xlabel('steps')
@@ -126,10 +121,9 @@ axs[0].legend(loc='upper right')
 axs[0].set_title('Prediction Window')
 plt.show()
 
-
 plt.rcParams['figure.figsize'] = [8, 8]
-plt.plot(xPred[0],xPred[1],label='data')
-plt.plot(RC.yEcho[0],RC.yEcho[1],label='echo')
+plt.plot(xPred[0],xPred[1],'.',label='data')
+# plt.plot(RC.yEcho[0],RC.yEcho[1],label='echo')
 plt.plot(RC.yInfer[0],RC.yInfer[1],label='infer')
 plt.plot(RC.yInfer2[0],RC.yInfer2[1],label='infer2')
 plt.xlabel('x')
@@ -148,17 +142,4 @@ plt.legend()
 plt.title(f'Reconstruction PC = {PCmat[0,0]:0.3f}')
 plt.show()
 
-# %%
-Anew = np.zeros((N+1,N+1))
-Bnew = np.zeros((N+1,D  ))
-# Anew = np.zeros((N,N))
-# Bnew = np.zeros((N,D  ))
-Anew[:N,:N] = RC.A.todense()
-Bnew[:N,:D] = RC.B.todense()
-Cnew = Anew+Bnew@RC.W
-Dnew = Cnew-np.eye(Cnew.shape[0])
-print('SR(A)\t\t', sp.linalg.eigvals(Anew).max())
-print('SR(B@W)\t\t', sp.linalg.eigvals(Bnew@RC.W).max())
-print('SR(A+B@W)\t', sp.linalg.eigvals(Cnew).max())
-print('SR(-1+A+B@W)\t', sp.linalg.eigvals(Dnew).max())
 # %%

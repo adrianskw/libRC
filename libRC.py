@@ -53,6 +53,7 @@ Created on Mon Oct 10
 ## Dependencies ##
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 import numpy as np
+import scipy as sp
 from scipy.linalg import eigvals as eigvals
 from scipy.sparse import random as sparseRandom
 from scipy.optimize import fsolve as fsolve
@@ -117,7 +118,7 @@ class Reservoir():
         self.A = self.A.multiply(self.rho/maxEig)
         print("Connection matrix is setup.")
 
-    def makeInputMat(self,sigma,sparseFlag=True,randMin=-0.0,randMax=1.0):
+    def makeInputMat(self,sigma,randMin=-0.0,randMax=1.0,sparseFlag=True):
         # dist options: np.random.uniform or np.random.normal
         # default is uniform in range [0,1), otherwise [randMin,randMax)
         # this uniform function is different from the one used in makeConnectionMat()
@@ -125,7 +126,7 @@ class Reservoir():
         # either sparse or full option
         if sparseFlag:
             row = np.arange(self.N)
-            col = np.argmax(np.random.rand(self.N, self.D), axis = 1) # chooses one of D inputs
+            col = np.sort(np.argmax(np.random.rand(self.N, self.D), axis = 1)) # chooses one of D inputs
             val = self.sigma*np.random.uniform(low=randMin,high=randMax,size=self.N)
             self.B = sparseCsrMatrix((val, (row, col)), shape=(self.N, self.D))
         else:
