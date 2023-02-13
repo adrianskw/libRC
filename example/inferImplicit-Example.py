@@ -8,15 +8,11 @@ Created on Wed Oct 12 09:56:30 2022
 # %autoreload 2
 
 import numpy as np
-import scipy as sp
-from scipy import linalg
 import matplotlib.pyplot as plt
-import sys as sys
-sys.path.append('../')
+from sys import path as path
+path.append('../')
 from libRC import diffRC,mapRC
-
 plt.rcParams.update({'font.size': 16})
-plt.rcParams['figure.figsize'] = [15, 3]
 
 def RK4(y,t,dt,f,params):
     k1 = dt*f(y,t,params)
@@ -42,7 +38,6 @@ def lorenz63(u,t,params):
     dydt = x*(rho-z)-y
     dzdt = x*y - beta*z
     return np.asarray([dxdt,dydt,dzdt])
-
 
 #%% generate data
 np.random.seed(11111)
@@ -75,31 +70,33 @@ N = 100
 rho = 0.9
 sigma = 0.1
 
-
-# ds = 0.3
-# RC = diffRC(N,D,ds,bias=True)
-# RC.chooseIntegrator('RK2')
-
-RC = mapRC(N,D,bias=True)
+mode = 'map'
+# mode = 'diff'
+if mode == 'map':
+    RC = mapRC(N,D,bias=True)
+elif mode == 'diff':
+    ds = 0.3
+    RC = diffRC(N,D,ds,bias=True)
+    RC.chooseIntegrator('RK2')
 
 RC.makeConnectionMat(rho,loc=-1,scale=2)
 RC.makeInputMat(sigma,randMin=0,randMax=1)
-
-# RC.A = sp.sparse.eye(N)
 
 RC.listen(y)
 RC.train(y,alpha=0.1)
 RC.echo(Mpred)
 
 driveIndex =[0,1,2]
-measInterval = 20
+measInterval = 50
 RC.infer(yPred[driveIndex],driveIndex)
+RC.infer2(yPred[driveIndex],driveIndex,measInterval)
 RC.inferImplicit(yPred[driveIndex],driveIndex,measInterval)
 
 plt.rcParams['figure.figsize'] = [15, 3]
 plt.plot(xPred[0,:Mplot],'.')
 plt.plot(RC.yInferImplicit[0,:Mplot])
 plt.plot(RC.yInfer[0,:Mplot])
+plt.plot(RC.yInfer2[0,:Mplot])
 plt.show()
 
 ticks = measInterval*(np.arange(int(Mpred/measInterval)))
@@ -151,18 +148,3 @@ plt.ylabel('infer')
 plt.legend()
 plt.title(f'Reconstruction PC = {PCmat[0,0]:0.3f}')
 plt.show()
-
-# %%
-Anew = np.zeros((N+1,N+1))
-Bnew = np.zeros((N+1,D  ))
-# Anew = np.zeros((N,N))
-# Bnew = np.zeros((N,D  ))
-Anew[:N,:N] = RC.A.todense()
-Bnew[:N,:D] = RC.B.todense()
-Cnew = Anew+Bnew@RC.W
-Dnew = Cnew-np.eye(Cnew.shape[0])
-print('SR(A)\t\t', sp.linalg.eigvals(Anew).max())
-print('SR(B@W)\t\t', sp.linalg.eigvals(Bnew@RC.W).max())
-print('SR(A+B@W)\t', sp.linalg.eigvals(Cnew).max())
-print('SR(-1+A+B@W)\t', sp.linalg.eigvals(Dnew).max())
-# %%

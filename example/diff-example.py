@@ -8,15 +8,11 @@ Created on Wed Oct 12 09:56:30 2022
 # %autoreload 2
 
 import numpy as np
-import scipy as sp
-from scipy import linalg
 import matplotlib.pyplot as plt
-import sys as sys
-sys.path.append('../')
+from sys import path as path
+path.append('../')
 from libRC import diffRC,mapRC
-
 plt.rcParams.update({'font.size': 16})
-plt.rcParams['figure.figsize'] = [15, 3]
 
 def RK4(y,t,dt,f,params):
     k1 = dt*f(y,t,params)
@@ -43,11 +39,10 @@ def lorenz63(u,t,params):
     dzdt = x*y - beta*z
     return np.asarray([dxdt,dydt,dzdt])
 
-
 #%% generate data
 np.random.seed(11111)
 D = 3
-N = 50
+N = 90
 
 M = 10000
 Mpred = 10000
@@ -78,18 +73,16 @@ ds = 0.1
 
 RC = diffRC(N,D,ds,bias=True)
 
-RC.makeConnectionMat(rho,loc=-1,scale=2)
-RC.makeInputMat(sigma,randMin=0,randMax=1)
-
-# RC.A = sp.sparse.eye(N)
+RC.makeConnectionMat(rho,density=0.02,loc=-1,scale=1)
+RC.makeInputMat(sigma,randMin=-1,randMax=1)
 
 RC.listen(y)
 RC.train(y,alpha=0.01)
 RC.echo(Mpred)
 
 driveIndex =[1]
+
 RC.infer(yPred[driveIndex],driveIndex)
-#%%
 plt.rcParams.update({'font.size': 16})
 plt.rcParams['figure.figsize'] = [15, 10]
 fig,axs = plt.subplots(3,sharex='col')
@@ -125,20 +118,4 @@ plt.ylabel('infer')
 plt.title(f'Reconstruction PC = {PCmat[0,0]:0.3f}')
 plt.show()
 
-# %%
-Anew = np.zeros((N+1,N+1))
-Bnew = np.zeros((N+1,D  ))
-# Anew = np.zeros((N,N))
-# Bnew = np.zeros((N,D  ))
-Anew[:N,:N] = RC.A.todense()
-Bnew[:N,:D] = RC.B.todense()
-Cnew = Anew+Bnew@RC.W
-Dnew = Cnew-np.eye(Cnew.shape[0])
-print('SR(A)\t\t', sp.linalg.eigvals(Anew).max())
-print('SR(B@W)\t\t', sp.linalg.eigvals(Bnew@RC.W).max())
-print('SR(A+B@W)\t', sp.linalg.eigvals(Cnew).max())
-print('SR(-1+A+B@W)\t', sp.linalg.eigvals(Dnew).max())
-print('mu(A+B@W)\t',sp.linalg.eigvals((Cnew.T+Cnew)/2).max())
-print('mu(-1+A+B@W)\t',sp.linalg.eigvals((Dnew.T+Dnew)/2).max())
-print('mu(-1+A)\t',sp.linalg.eigvals((Anew.T+Anew)/2).max())
 # %%
