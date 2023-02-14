@@ -9,14 +9,9 @@ Created on Wed Oct 12 09:56:30 2022
 
 import numpy as np
 import matplotlib.pyplot as plt
-import sys as sys
-import os as os
-sys.path.append(os.path.abspath('..'))
+from sys import path as path
+path.append('../')
 from libRC import diffRC,mapRC
-from scipy.stats import norm as statsNormal
-
-plt.rcParams.update({'font.size': 16})
-plt.rcParams['figure.figsize'] = [15, 3]
 
 def RK4(y,t,dt,f,params):
     k1 = dt*f(y,t,params)
@@ -43,10 +38,14 @@ def lorenz63(u,t,params):
     dzdt = x*y - beta*z
     return np.asarray([dxdt,dydt,dzdt])
 
-''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+#%% generate data
+np.random.seed(11111)
 D = 3
+N = 50
+
 M = 10000
-Mpred = 2500
+Mpred = 10000
+Mplot = 4000
 dt = 0.01
 t = 0 # dummy variable
 
@@ -55,7 +54,6 @@ rho = 28     # Rayleigh number
 beta = 8.0/3
 params = [sigma,rho,beta]
 
-np.random.seed(11111)
 x = np.zeros((D,M))
 xPred = np.zeros((D,Mpred))
 x[:,0] = [12,13,14]
@@ -65,9 +63,8 @@ y = x+np.random.normal(loc=0.0,scale=0.5,size=x.shape)
 
 xPred[:,0] = RK4(x[:,-1],t,dt,lorenz63,params)
 xPred = forwardInt(Mpred,xPred,t,dt,lorenz63,params)
-yPred = xPred+np.random.normal(loc=0.0,scale=0.7,size=xPred.shape)
-
-''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+yPred = xPred+np.random.normal(loc=0.0,scale=1,size=xPred.shape)
+#%%
 np.random.seed(11111)
 N = 500
 ds = 0.1
@@ -76,7 +73,7 @@ RC.chooseIntegrator('RK4')
 
 rho = 0.9
 sigma = 0.1
-RC.makeConnectionMat(rho,density=0.03,zeroDiag=False,dist=statsNormal,loc=0,scale=1)
+RC.makeConnectionMat(rho,density=0.03,zeroDiag=False,loc=0,scale=1)
 RC.makeInputMat(sigma,randMin=-1,randMax=1)
 
 RC.listen(y)
@@ -96,8 +93,8 @@ for i in range(D):
     plt.plot(RC.yInfer[i],label='infer')
     plt.legend(loc='upper right')
     plt.show()
-    
-''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+#%%
 np.random.seed(11111)
 N = 50
 ds = 0.2
@@ -106,7 +103,7 @@ RC.chooseIntegrator('RK2')
 
 rho = 0.9
 sigma = 0.1
-RC.makeConnectionMat(rho,density=0.03,zeroDiag=False,dist=statsNormal,loc=0,scale=1)
+RC.makeConnectionMat(rho,density=0.03,zeroDiag=False,loc=-1,scale=1)
 RC.makeInputMat(sigma,randMin=0,randMax=1)
 
 RC.listen(y)
@@ -126,21 +123,21 @@ for i in range(D):
     plt.plot(RC.yInfer[i],label='infer')
     plt.legend(loc='upper right')
     plt.show()
+#%%
 
-''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 np.random.seed(11111)
 N = 200
 ds = 0.1
 RC = diffRC(N,D,ds)
 RC.chooseIntegrator('RK2')
 
-rho = 0.9
+rho = 0.8
 sigma = 0.1
-RC.makeConnectionMat(rho,density=0.1,zeroDiag=True,loc=-1,scale=1)
+RC.makeConnectionMat(rho,density=0.05,zeroDiag=True,loc=-1,scale=2)
 RC.makeInputMat(sigma,randMin=0,randMax=1)
 
 RC.listen(y)
-RC.train(y,alpha=0.00)
+RC.train(y,alpha=0.01)
 RC.echo(Mpred)
 
 driveIndex =[1]
@@ -157,8 +154,7 @@ for i in range(D):
     plt.legend(loc='upper right')
     plt.show()
 
-
-''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+#%%
 np.random.seed(11111)
 N = 66
 ds = 0.2
@@ -167,7 +163,7 @@ RC.chooseIntegrator('RK2')
 
 rho = 0.8
 sigma = 0.1
-RC.makeConnectionMat(rho,density=0.02,zeroDiag=False,dist=statsNormal,loc=0,scale=1)
+RC.makeConnectionMat(rho,density=0.02,zeroDiag=False,loc=-1,scale=2)
 RC.makeInputMat(sigma,randMin=0,randMax=1)
 
 RC.listen(y,randFlag=True,randMin=-1,randMax=-1)

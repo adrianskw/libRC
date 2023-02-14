@@ -43,7 +43,7 @@ def lorenz63(u,t,params):
 np.random.seed(11111)
 D = 3
 
-M = 30000
+M = 50000
 Mpred = 4200
 Mplot = 4200
 dt = 0.01
@@ -93,20 +93,25 @@ RC.infer2(yPred[driveIndex],driveIndex,measInterval)
 RC.inferImplicit(yPred[driveIndex],driveIndex,measInterval)
 
 plt.rcParams['figure.figsize'] = [15, 3]
-plt.plot(xPred[0,:Mplot],'.')
-plt.plot(RC.yInferImplicit[0,:Mplot])
-plt.plot(RC.yInfer[0,:Mplot])
-plt.plot(RC.yInfer2[0,:Mplot])
+plt.plot(xPred[0,:Mplot],'.',label='data')
+plt.plot(RC.yInfer[0,:Mplot],label='infer')
+plt.plot(RC.yInfer2[0,:Mplot],label='infer2')
+plt.plot(RC.yInferImplicit[0,:Mplot],label='inferImplicit')
+plt.legend()
 plt.show()
 
+plt.title('Implicit Solve Error')
 ticks = measInterval*(np.arange(int(Mpred/measInterval)))
 plt.semilogy(np.abs(yPred[0,:Mplot]-RC.yInferImplicit[0,:Mplot]))
-plt.semilogy(ticks,np.abs(yPred[0,:Mplot:measInterval]-RC.yInferImplicit[0,:Mplot:measInterval]),'.')
+plt.semilogy(ticks,np.abs(yPred[0,:Mplot:measInterval]-RC.yInferImplicit[0,:Mplot:measInterval]),'.',label='Implicit Solve Performed')
+plt.legend()
 plt.show()
 print(np.linalg.norm(yPred-RC.yInferImplicit)/M)
 
+plt.title('Reservoir Error')
 plt.semilogy(np.linalg.norm(RC.rInfer[:,:Mplot]-RC.rInferImplicit[:,:Mplot],axis=0))
-plt.semilogy(ticks,np.linalg.norm(RC.rInfer[:,:Mplot:measInterval]-RC.rInferImplicit[:,:Mplot:measInterval],axis=0),'.')
+plt.semilogy(ticks,np.linalg.norm(RC.rInfer[:,:Mplot:measInterval]-RC.rInferImplicit[:,:Mplot:measInterval],axis=0),'.',label='Implicit Solve Performed')
+plt.legend()
 plt.show()
 print(np.linalg.norm(RC.rInfer-RC.rInferImplicit)/M)
 #%%
