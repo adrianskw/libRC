@@ -156,6 +156,8 @@ ref4 = np.load('test4.npz')
 # %%
 
 print("---------------------------------------------------------------")
+print("Running Exact Numerical Tests")
+print("---------------------------------------------------------------")
 tol = {'yHat':1e-4,'yEcho':1e-1,'yInfer':1e-4}
 vars = ['yHat','yEcho','yInfer']
 print("Tolerances are",tol)
