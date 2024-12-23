@@ -41,7 +41,6 @@ def lorenz63(u,t,params):
 #%% generate data
 np.random.seed(11111)
 D = 3
-N = 50
 
 M = 10000
 Mpred = 10000
@@ -54,16 +53,17 @@ rho = 28     # Rayleigh number
 beta = 8.0/3
 params = [sigma,rho,beta]
 
+noiseLevel = 0.5
 x = np.zeros((D,M))
 xPred = np.zeros((D,Mpred))
 x[:,0] = [12,13,14]
 x[:,0] = burnIn(3456,x[:,0],t,dt,lorenz63,params)
 x = forwardInt(M,x,t,dt,lorenz63,params)
-y = x+np.random.normal(loc=0.0,scale=0.5,size=x.shape)
+y = x+np.random.normal(loc=0.0,scale=noiseLevel,size=x.shape)
 
 xPred[:,0] = RK4(x[:,-1],t,dt,lorenz63,params)
 xPred = forwardInt(Mpred,xPred,t,dt,lorenz63,params)
-yPred = xPred+np.random.normal(loc=0.0,scale=1,size=xPred.shape)
+yPred = xPred+np.random.normal(loc=0.0,scale=noiseLevel,size=xPred.shape)
 #%%
 np.random.seed(11111)
 N = 500
@@ -73,7 +73,7 @@ RC.chooseIntegrator('RK4')
 
 rho = 0.9
 sigma = 0.1
-RC.makeConnectionMat(rho,density=0.03,zeroDiag=False,loc=0,scale=1)
+RC.makeConnectionMat(rho,density=0.02,zeroDiag=False,loc=0,scale=1)
 RC.makeInputMat(sigma,randMin=-1,randMax=1)
 
 RC.listen(y)
@@ -96,13 +96,13 @@ for i in range(D):
 
 #%%
 np.random.seed(11111)
-N = 50
-ds = 0.2
+N = 100
+ds = 0.25
 RC = diffRC(N,D,ds)
 RC.chooseIntegrator('RK2')
 
 rho = 0.9
-sigma = 0.1
+sigma = 2/max(np.max(y,1)-np.min(y,1))/ds
 RC.makeConnectionMat(rho,density=0.03,zeroDiag=False,loc=-1,scale=1)
 RC.makeInputMat(sigma,randMin=0,randMax=1)
 
@@ -125,15 +125,15 @@ for i in range(D):
     plt.show()
 #%%
 
-np.random.seed(11111)
+np.random.seed(1111)
 N = 200
-ds = 0.1
+ds = 0.2
 RC = diffRC(N,D,ds)
 RC.chooseIntegrator('RK2')
 
 rho = 0.8
 sigma = 0.1
-RC.makeConnectionMat(rho,density=0.05,zeroDiag=True,loc=-1,scale=2)
+RC.makeConnectionMat(rho,density=0.02,zeroDiag=True,loc=-1,scale=2)
 RC.makeInputMat(sigma,randMin=0,randMax=1)
 
 RC.listen(y)
@@ -162,8 +162,8 @@ RC = diffRC(N,D,ds)
 RC.chooseIntegrator('RK2')
 
 rho = 0.8
-sigma = 0.1
-RC.makeConnectionMat(rho,density=0.02,zeroDiag=False,loc=-1,scale=2)
+sigma = 0.12
+RC.makeConnectionMat(rho,density=0.02,zeroDiag=False,loc=-1,scale=1)
 RC.makeInputMat(sigma,randMin=0,randMax=1)
 
 RC.listen(y,randFlag=True,randMin=-1,randMax=-1)
