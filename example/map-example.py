@@ -44,9 +44,9 @@ np.random.seed(11111)
 D = 3
 N = 50
 
-M = 10000
-Mpred = 10000
-Mplot = 4000
+M = 15000
+Mpred = M
+Mplot = M//2
 dt = 0.01
 t = 0 # dummy variable
 
@@ -55,20 +55,21 @@ rho = 28     # Rayleigh number
 beta = 8.0/3
 params = [sigma,rho,beta]
 
+noiseLevel = 0.5
 x = np.zeros((D,M))
 xPred = np.zeros((D,Mpred))
 x[:,0] = [12,13,14]
 x[:,0] = burnIn(3456,x[:,0],t,dt,lorenz63,params)
 x = forwardInt(M,x,t,dt,lorenz63,params)
-y = x+np.random.normal(loc=0.0,scale=0.5,size=x.shape)
+y = x+np.random.normal(loc=0.0,scale=noiseLevel,size=x.shape)
 
 xPred[:,0] = RK4(x[:,-1],t,dt,lorenz63,params)
 xPred = forwardInt(Mpred,xPred,t,dt,lorenz63,params)
-yPred = xPred+np.random.normal(loc=0.0,scale=1,size=xPred.shape)
+yPred = xPred+np.random.normal(loc=0.0,scale=noiseLevel,size=xPred.shape)
 #%% standard RC usage
 np.random.seed(11111)
 rho = 0.9
-sigma = 0.1
+sigma = 2/max(np.max(y,1)-np.min(y,1))
 
 RC = mapRC(N,D,bias=True)
 
@@ -76,7 +77,7 @@ RC.makeConnectionMat(rho,density=0.02,loc=-1,scale=1)
 RC.makeInputMat(sigma,randMin=-1,randMax=1)
 
 RC.listen(y)
-RC.train(y,alpha=0.01)
+RC.train(y,alpha=0.02)
 RC.echo(Mpred)
 
 driveIndex =[1]
@@ -111,9 +112,11 @@ plt.show()
 
 PCmat = RC.inferPC(yPred)
 plt.rcParams['figure.figsize'] = [8, 8]
-plt.plot(yPred[0],RC.yInfer[0],',')
+plt.plot(yPred[0],RC.yInfer[0],'.')
+plt.plot(yPred[1],RC.yInfer[1],'.')
 plt.xlabel('data')
 plt.ylabel('infer')
 plt.title(f'Reconstruction PC = {PCmat[0,0]:0.3f}')
+plt.legend(['Unobserved','Observed'])
 plt.show()
 # %%

@@ -58,7 +58,9 @@ from scipy.linalg import eigvals as eigvals
 from scipy.sparse import random as sparseRandom
 from scipy.optimize import fsolve as fsolve
 from scipy.sparse import csr_matrix as sparseCsrMatrix
-from scipy.sparse.linalg import eigs as sparseEigs
+from scipy.sparse import diags as sparseDiags
+from scipy.sparse.linalg import eigs as eigs
+from scipy.sparse.linalg import svds as svds
 from scipy.stats import uniform as statsUniform
 from scipy.stats import norm as statsNormal
 import time as time
@@ -107,36 +109,60 @@ class Reservoir():
         # normal distribution is N(loc,scale)
         self.rho = rho
         self.density = density
-        self.A = sparseRandom(self.N, self.N, density = self.density, data_rvs = dist(loc=loc, scale=scale).rvs)
+        self.A = sparseRandom(self.N, self.N, density = self.density, data_rvs = dist(loc,scale).rvs)
         # zero diagonal option
         if zeroDiag:
             self.A.setdiag(0)
             self.A.eliminate_zeros()
         # find spectral radius, i.e. Largest Magnitude (LM) eigenvalue
-        maxEig = np.abs(sparseEigs(self.A, k = 1, which='LM', return_eigenvectors=False))
+        maxEig = np.abs(eigs(self.A, k = 1, which='LM', return_eigenvectors=False))
+        # maxEig = svds(self.A, k = 1, which='LM', return_singular_vectors=False)
         # rescale to specified spectral radius
         self.A = self.A.multiply(self.rho/maxEig)
         print("Connection matrix is setup.")
+        
+    def makeDiagConnectionMat(self,rho=1,randMin=-1.0,randMax=1.0):
+        # default is uniform in range [-1,1)
+        self.rho = rho
+        diagElem = np.random.uniform(randMin,randMax,self.N)
+        # rescale to specified spectral radius
+        self.A = sparseDiags(diagElem).multiply(self.rho/max(diagElem))
+        print("Diagonal-Only Connection matrix is setup.")
 
-    def makeInputMat(self,sigma,randMin=-0.0,randMax=1.0,sparseFlag=True):
+    def makeInputMat(self,sigma,randMin=0.0,randMax=1.0,sparseFlag=True):
         # dist options: np.random.uniform or np.random.normal
         # default is uniform in range [0,1), otherwise [randMin,randMax)
         # this uniform function is different from the one used in makeConnectionMat()
         self.sigma = sigma
         # either sparse or full option
         if sparseFlag:
-            row = np.arange(self.N)
-            col = np.sort(np.argmax(np.random.rand(self.N, self.D), axis = 1)) # chooses one of D inputs
             val = self.sigma*np.random.uniform(low=randMin,high=randMax,size=self.N)
-            self.B = sparseCsrMatrix((val, (row, col)), shape=(self.N, self.D))
+            self.B = sparseCsrMatrix((val, (np.arange(self.N), np.sort(np.arange(self.N)%self.D))), shape=(self.N, self.D))
         else:
             self.B = np.random.random(size=(self.N,self.D))
             for i in range(self.N):
                 self.B[i] = self.sigma*self.B[i]/np.linalg.norm(self.B[i])   
         print("Input matrix is setup.")
+        
+    # def makeInputMat(self,sigma,randMin=-1.0,randMax=1.0,sparseFlag=True):
+    #     # dist options: np.random.uniform or np.random.normal
+    #     # default is uniform in range [0,1), otherwise [randMin,randMax)
+    #     # this uniform function is different from the one used in makeConnectionMat()
+    #     self.sigma = sigma
+    #     # either sparse or full option
+    #     if sparseFlag:
+    #         row = np.arange(self.N)
+    #         col = np.sort(np.argmax(np.random.rand(self.N, self.D), axis = 1)) # chooses one of D inputs
+    #         val = self.sigma*np.random.uniform(low=randMin,high=randMax,size=self.N)
+    #         self.B = sparseCsrMatrix((val, (row, col)), shape=(self.N, self.D))
+    #     else:
+    #         self.B = np.random.random(size=(self.N,self.D))
+    #         for i in range(self.N):
+    #             self.B[i] = self.sigma*self.B[i]/np.linalg.norm(self.B[i])   
+    #     print("Input matrix is setup.")
 
 # Listening Functions
-    def listen(self,y,randFlag=False,randMin=-10,randMax=10):
+    def listen(self,y,randFlag=False,randMin=-1.5,randMax=1.5):
         # check for exception
         if y.shape[0] != self.D:
             raise Exception('Shape of input data y(t) should be in the shape of DxM.')
