@@ -10,7 +10,6 @@ Created on Mon Oct 10
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
     # Reservoir Parameters
     N           -   dimension of reservoir / number of nodes in reservoir
-    D           -   dimension of the input data
     activ       -   activation function, defaults to np.tanh
     bias        -   adds a bias output node to the W fit (advised AGAINST using this)
 
@@ -24,6 +23,8 @@ Created on Mon Oct 10
     sigma       -   scaling/normalization factor
 
     # Output Matrix and Parameters
+    mask        -   to specify which index of the output should be used as input
+    D           -   dimension of the input data
     W           -   output weight matrix 
     alpha       -   ridge parameter for least squares fit 
     
@@ -34,26 +35,27 @@ Created on Mon Oct 10
     # Listening Time Series
     M           -   number of steps of the incoming data
     r           -   reservoir state / internal representation (N x M)
-    y           -   (external) input data (D x M) 
-    yHat        -   reservoirs attempt to fit r to y (D x M)
+    y_in        -   (external) input data (D x M) 
+    y_target    -   (external) target/output data
+    y_est       -   reservoir estimate when fitting r to y (D x M)
     
     # Echoing Time Series
-    Mecho       -   number of steps to echo (value not stored explicitly in object)
-    rEcho       -   state of the autonomous reservoir
-    yEcho       -   prediction of the original dataset using the autonomous reservoir
+    M_echo      -   number of steps to echo (value not stored explicitly in object)
+    r_echo      -   state of the autonomous reservoir
+    y_echo      -   prediction of the original dataset using the autonomous reservoir
     
     # Inference Time Series
-    Minfer      -   number of steps to infer (value not stored explicitly in object)
-    yDrive      -   (external) signal that continues to be presented to the reservoir 
-    rInfer      -   reservoir state if the signal continues to be presented after training
-    yInfer      -   state reconstruction assuming that signal continues to be presented
+    M_infer     -   number of steps to infer (value not stored explicitly in object)
+    y_drive     -   (external) signal that continues to be presented to the reservoir 
+    r_infer     -   reservoir state if the signal continues to be presented after training
+    y_infer     -   state reconstruction assuming that signal continues to be presented
                     after training
                 
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 ## Dependencies ##
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 import numpy as np
-import scipy as sp
+# import scipy as sp
 from scipy.linalg import eigvals as eigvals
 from scipy.sparse import random as sparseRandom
 from scipy.optimize import fsolve as fsolve
@@ -78,12 +80,11 @@ specified in the subclasses.
 # Reservoir class SHOULD NOT BE DIRECTLY CALLABLE
 # Initialize with diffRC or mapRC subclasses instead
 class Reservoir():
-    def __init__(self,N,D,activ=np.tanh,bias=False):
+    def __init__(self,N,activ=np.tanh,bias=False):
         # basic RC parameters
         self.N          = N
-        self.D          = D
         self.activ      = activ
-        self.bias       = bias # advised AGAINST using this
+        self.bias       = bias # better for mapRC, better without for diffRC
         # parameters for dynamics
         self.A          = None
         self.rho        = None
@@ -92,18 +93,21 @@ class Reservoir():
         self.B          = None
         self.sigma      = None
         # parameters for fit
+        self.mask       = None
+        self.D          = None # created in makeInputMat
         self.W          = None
         self.alpha      = None
         # reservoir trajectories
         self.M          = None
         self.r          = None
-        self.yHat       = None
+        self.y_est      = None
         # prediction/echo trajectories
-        self.rEcho      = None
-        self.yEcho      = None
+        self.r_echo     = None
+        self.y_echo     = None
 
 # Setup Functions for Matrices
     def makeConnectionMat(self,rho,density=0.02,zeroDiag=False,dist=statsUniform,loc=-1.0,scale=2.0):
+        # connection matrix is currently constructed based on sparsity, but will be updated to be based on degree in the future
         # dist options: stats.uniform or stats.normal
         # default is uniform in range [-1,1), otherwise [loc,loc+scale)
         # normal distribution is N(loc,scale)
@@ -129,10 +133,11 @@ class Reservoir():
         self.A = sparseDiags(diagElem).multiply(self.rho/max(diagElem))
         print("Diagonal-Only Connection matrix is setup.")
 
-    def makeInputMat(self,sigma,randMin=0.0,randMax=1.0,sparseFlag=True):
+    def makeInputMat(self,D,sigma,randMin=0.0,randMax=1.0,sparseFlag=True):
         # dist options: np.random.uniform or np.random.normal
         # default is uniform in range [0,1), otherwise [randMin,randMax)
         # this uniform function is different from the one used in makeConnectionMat()
+        self.D = D
         self.sigma = sigma
         # either sparse or full option
         if sparseFlag:
@@ -162,20 +167,35 @@ class Reservoir():
     #     print("Input matrix is setup.")
 
 # Listening Functions
-    def listen(self,y,randFlag=False,randMin=-1.5,randMax=1.5):
+    def listen(self,y_in,randFlag=False,randMin=-1.5,randMax=1.5):
         # check for exception
-        if y.shape[0] != self.D:
-            raise Exception('Shape of input data y(t) should be in the shape of DxM.')
+        # if len(y.shape[0]) != self.D:
+        #     raise Exception('Shape of input data y(t) should be in the shape of DxM.')
         # starting timer
         print("Listening phase in progress...")
         startTime = time.time()
         # establish r
-        self.M = y.shape[1]
+        if len(y_in.shape)>1:
+            self.M = y_in.shape[1]
+        else:
+            self.M = len(y_in)
+        #setup
         self.listenSetup(randFlag,randMin,randMax)
         # listening main loop
+        self.M = y_in.shape[1]
         for i in range(1,self.M):
-            self.r[:,i] = self.step(self.r[:,i-1],y[:,i-1])
+            self.r[:,i] = self.step(self.r[:,i-1],y_in[:,i-1])
             self.progressBar(i,self.M)
+        # if len(y_in.shape)>1:
+        #     self.M = y_in.shape[1]
+        #     for i in range(1,self.M):
+        #         self.r[:,i] = self.step(self.r[:,i-1],y_in[:,i-1])
+        #         self.progressBar(i,self.M)
+        # else:
+        #     self.M = len(y_in)
+        #     for i in range(1,self.M):
+        #         self.r[:,i] = self.step(self.r[:,i-1],y_in[i-1])
+        #         self.progressBar(i,self.M)
         # wall time
         print(f"\nListening phase completed. Time taken: {time.time()-startTime:.3} seconds.")
         print('-----------------------------------------------------------------')
@@ -189,10 +209,16 @@ class Reservoir():
             self.r = np.zeros((self.N,self.M))
 
 # Training with Linear Fit
-    def train(self,y,start=0,end=None,alpha=0.02):
-        # starting timer
-        startTime = time.time()
-        print("Training in progress...")
+    def train(self,y_target,start=0,end=None,alpha=0.02,mask=None):
+        if mask == None:
+            if y_target.shape[0] != self.D:
+                print("Mismatch in input vs target dimensions. Mask required. Halting code.")
+                return -1
+            self.mask = np.eye(self.D)
+        else:
+            self.mask = mask
+
+
         # small hack to make default 'end' from class variables
         if end is None:
             end = self.M
@@ -201,155 +227,159 @@ class Reservoir():
             self.r = np.vstack([self.r,np.ones(self.M)])
         # alpha is the regularization parameter of ridge regression
         self.alpha = alpha
+        
+        # starting timer
+        startTime = time.time()
+        print("Training in progress...")
         # run fit to solve for W (refer to the README)
         RRT = self.r[:,start:end]@self.r[:,start:end].T + self.alpha * np.eye(self.r.shape[0])
-        URT = y[:,start:end]@self.r[:,start:end].T
+        URT = y_target[:,start:end]@self.r[:,start:end].T
         self.W = np.linalg.solve(RRT,URT.T).T # RRT is symmetric so RRT = RRT.T
         # determining reconstructed state
-        self.yHat = np.zeros((self.D,self.M))
-        self.yHat[:,start:end] = self.W@self.r[:,start:end]
+        self.y_est = np.zeros(y_target.shape)
+        self.y_est[:,start:end] = self.W@self.r[:,start:end]
         # determining fit error and wall time
-        self.fitError = np.sqrt(np.linalg.norm(self.yHat-y)**2)/self.M/self.D
+        self.fitError = np.sqrt(np.linalg.norm(self.y_est-y_target)**2)/self.M/self.D
         print(f'Fit Error: {self.fitError:12.4f}')
         print(f"Training phase completed. Time taken: {time.time()-startTime:.3} seconds.")
         print('-----------------------------------------------------------------') 
 
 # Echoing Functions
-    def echo(self,Mecho,randFlag=False,randMin=-10,randMax=10):
+    def echo(self,M_echo,randFlag=False,randMin=-10,randMax=10):
         # starting timer
         print("Echoing phase in progress...")
         startTime = time.time()
-        # establish rEcho
-        self.echoSetup(Mecho,randFlag,randMin,randMax)
+        # establish r_echo
+        self.echoSetup(M_echo,randFlag,randMin,randMax)
         # echoing main loop
-        for i in range(1,Mecho):
-            self.rEcho[:self.N,i] = self.step(self.rEcho[:self.N,i-1],self.W@self.rEcho[:,i-1])
-            self.progressBar(i,Mecho)
-        self.yEcho = self.W@self.rEcho
+        for i in range(1,M_echo):
+            self.r_echo[:self.N,i] = self.step(self.r_echo[:self.N,i-1],self.mask@self.W@self.r_echo[:,i-1])
+            self.progressBar(i,M_echo)
+        self.y_echo = self.W@self.r_echo
         # wall time
         print(f"\nEchoing phase completed. Time taken: {time.time()-startTime:.3} seconds.")
         print('-----------------------------------------------------------------')
 
-    def echoSetup(self,Mecho,randFlag,randMin,randMax):
-        self.rEcho = np.ones((self.r.shape[0],Mecho))
-        self.rEcho[:self.N,0] = self.step(self.r[:self.N,-1],self.W@self.r[:,-1])
+    def echoSetup(self,M_echo,randFlag,randMin,randMax):
+        self.r_echo = np.ones((self.r.shape[0],M_echo))
+        self.r_echo[:self.N,0] = self.step(self.r[:self.N,-1],self.mask@self.W@self.r[:,-1])
         # randFlag for testing sychronization
         if randFlag == True:
             print("Perturbing Reservoir States...")
-            self.rEcho[:self.N,0] += np.random.uniform(low=randMin,high=randMax,size=self.N)
+            self.r_echo[:self.N,0] += np.random.uniform(low=randMin,high=randMax,size=self.N)
 
 # Inference Functions
-    def infer(self,yDrive,driveIndex,randFlag=False,randMin=-10,randMax=10):
+    def infer(self,y_drive,driveIndex,randFlag=False,randMin=-10,randMax=10):
         # check for exception
-        if yDrive.shape[0]!=len(driveIndex):
+        if y_drive.shape[0]!=len(driveIndex):
             raise Exception('Shape of driving data does not match the number of drive variables.')
         # starting timer
         print("Inference phase in progress...")
         startTime = time.time()
-        # establish rInfer
-        Minfer = yDrive.shape[1]
-        self.inferSetup(Minfer,randFlag,randMin,randMax)
+        # establish r_infer
+        M_infer = y_drive.shape[1]
+        self.inferSetup(M_infer,randFlag,randMin,randMax)
         # inferring main loop
-        for i in range(1,Minfer):
+        for i in range(1,M_infer):
             # placeholder vector
-            yTemp = self.W@self.rInfer[:,i-1]
+            yTemp = self.mask@self.W@self.r_infer[:,i-1]
             # replacing measured variables with data
-            yTemp[driveIndex] = np.copy(yDrive[:,i-1])
-            self.rInfer[:self.N,i] = self.step(self.rInfer[:self.N,i-1],yTemp)
-            self.progressBar(i,Minfer)
-        self.yInfer = self.W@self.rInfer
+            yTemp[driveIndex] = np.copy(y_drive[:,i-1])
+            self.r_infer[:self.N,i] = self.step(self.r_infer[:self.N,i-1],yTemp)
+            self.progressBar(i,M_infer)
+        self.y_infer = self.mask@self.W@self.r_infer
         # wall time
         print(f"\nInference phase completed. Time taken: {time.time()-startTime:.3} seconds.")
         print('-----------------------------------------------------------------')
 
-    def infer2(self,yDrive,driveIndex,measInterval,randFlag=False,randMin=-10,randMax=10):
-        # check for exception
-        if yDrive.shape[0]!=len(driveIndex):
-            raise Exception('Shape of driving data does not match the number of drive variables.')
-        # starting timer
-        print("Inference 2 phase in progress...")
-        startTime = time.time()
-        # establish rInfer
-        Minfer = yDrive.shape[1]
-        self.infer2Setup(Minfer,randFlag,randMin,randMax)
-        # inferring main loop
-        for i in range(1,Minfer):
-            # placeholder vector
-            yTemp = self.W@self.rInfer2[:,i-1]
-            self.rInfer2[:self.N,i] = self.step(self.rInfer2[:self.N,i-1],yTemp)
-            if i%measInterval==0:
-                # replacing measured variables with data
-                yTemp[driveIndex] = np.copy(yDrive[:,i-1])
-                self.rInfer2[:self.N,i] = self.step(self.rInfer2[:self.N,i-1],yTemp)
-            self.progressBar(i,Minfer)
-        self.yInfer2 = self.W@self.rInfer2
-        # wall time
-        print(f"\nInference 2 phase completed. Time taken: {time.time()-startTime:.3} seconds.")
-        print('-----------------------------------------------------------------')
-
-    def inferImplicit(self,yDrive,driveIndex,measInterval,randFlag=False,randMin=-10,randMax=10):
-        # check for exception
-        if yDrive.shape[0]!=len(driveIndex):
-            raise Exception('Shape of driving data does not match the number of drive variables.')
-        # starting timer
-        print("Inference Implicit phase in progress...")
-        startTime = time.time()
-        # establish rInfer
-        Minfer = yDrive.shape[1]
-        self.inferImplicitSetup(Minfer,randFlag,randMin,randMax)
-        # inferring main loop
-        rTemp = self.rInferImplicit[:,0]
-        for i in range(1,Minfer):
-            # placeholder vector
-            yTemp = self.W@self.rInferImplicit[:,i-1]
-            self.rInferImplicit[:self.N,i] = self.step(self.rInferImplicit[:self.N,i-1],yTemp)
-            if i%measInterval==0:
-                # replacing measured variables with data
-                self.rInferImplicit[:self.N,i] = fsolve(self.consistencyImplicit,self.rInferImplicit[:self.N,i],
-                args=(yDrive[:,i],driveIndex))
-            self.progressBar(i,Minfer)
-        self.yInferImplicit = self.W@self.rInferImplicit
-        # wall time
-        print(f"\nInference 2 phase completed. Time taken: {time.time()-startTime:.3} seconds.")
-        print('-----------------------------------------------------------------')
-    
-    def inferSetup(self,Minfer,randFlag,randMin,randMax):
-        self.rInfer = np.ones((self.r.shape[0],Minfer))
-        self.rInfer[:self.N,0] = self.step(self.r[:self.N,-1],self.W@self.r[:,-1])
+    def inferSetup(self,M_infer,randFlag,randMin,randMax):
+        self.r_infer = np.ones((self.r.shape[0],M_infer))
+        self.r_infer[:self.N,0] = self.step(self.r[:self.N,-1],self.mask@self.W@self.r[:,-1])
         # randFlag for testing sychronization
         if randFlag == True:
             print("Perturbing Reservoir States...")
-            self.rInfer[:self.N,0] += np.random.uniform(low=randMin,high=randMax,size=self.N)
+            self.r_infer[:self.N,0] += np.random.uniform(low=randMin,high=randMax,size=self.N)
 
-    def infer2Setup(self,Minfer,randFlag,randMin,randMax):
-        self.rInfer2 = np.ones((self.r.shape[0],Minfer))
-        self.rInfer2[:self.N,0] = self.step(self.r[:self.N,-1],self.W@self.r[:,-1])
-        # randFlag for testing sychronization
-        if randFlag == True:
-            print("Perturbing Reservoir States...")
-            self.rInfer2[:self.N,0] += np.random.uniform(low=randMin,high=randMax,size=self.N)
+    # def infer2(self,y_drive,driveIndex,measInterval,randFlag=False,randMin=-10,randMax=10):
+    #     # check for exception
+    #     if y_drive.shape[0]!=len(driveIndex):
+    #         raise Exception('Shape of driving data does not match the number of drive variables.')
+    #     # starting timer
+    #     print("Inference 2 phase in progress...")
+    #     startTime = time.time()
+    #     # establish r_infer
+    #     M_infer = y_drive.shape[1]
+    #     self.infer2Setup(M_infer,randFlag,randMin,randMax)
+    #     # inferring main loop
+    #     for i in range(1,M_infer):
+    #         # placeholder vector
+    #         yTemp = self.W@self.r_infer2[:,i-1]
+    #         self.r_infer2[:self.N,i] = self.step(self.r_infer2[:self.N,i-1],yTemp)
+    #         if i%measInterval==0:
+    #             # replacing measured variables with data
+    #             yTemp[driveIndex] = np.copy(y_drive[:,i-1])
+    #             self.r_infer2[:self.N,i] = self.step(self.r_infer2[:self.N,i-1],yTemp)
+    #         self.progressBar(i,M_infer)
+    #     self.y_infer2 = self.W@self.r_infer2
+    #     # wall time
+    #     print(f"\nInference 2 phase completed. Time taken: {time.time()-startTime:.3} seconds.")
+    #     print('-----------------------------------------------------------------')
 
-    def inferImplicitSetup(self,Minfer,randFlag,randMin,randMax):
-        self.rInferImplicit = np.ones((self.r.shape[0],Minfer))
-        self.rInferImplicit[:self.N,0] = self.step(self.r[:self.N,-1],self.W@self.r[:,-1])
-        # randFlag for testing sychronization
-        if randFlag == True:
-            print("Perturbing Reservoir States...")
-            self.rInferImplicit[:self.N,0] += np.random.uniform(low=randMin,high=randMax,size=self.N)
+    # def inferImplicit(self,y_drive,driveIndex,measInterval,randFlag=False,randMin=-10,randMax=10):
+    #     # check for exception
+    #     if y_drive.shape[0]!=len(driveIndex):
+    #         raise Exception('Shape of driving data does not match the number of drive variables.')
+    #     # starting timer
+    #     print("Inference Implicit phase in progress...")
+    #     startTime = time.time()
+    #     # establish r_infer
+    #     M_infer = y_drive.shape[1]
+    #     self.inferImplicitSetup(M_infer,randFlag,randMin,randMax)
+    #     # inferring main loop
+    #     rTemp = self.r_inferImplicit[:,0]
+    #     for i in range(1,M_infer):
+    #         # placeholder vector
+    #         yTemp = self.W@self.r_inferImplicit[:,i-1]
+    #         self.r_inferImplicit[:self.N,i] = self.step(self.r_inferImplicit[:self.N,i-1],yTemp)
+    #         if i%measInterval==0:
+    #             # replacing measured variables with data
+    #             self.r_inferImplicit[:self.N,i] = fsolve(self.consistencyImplicit,self.r_inferImplicit[:self.N,i],
+    #             args=(y_drive[:,i],driveIndex))
+    #         self.progressBar(i,M_infer)
+    #     self.y_inferImplicit = self.W@self.r_inferImplicit
+    #     # wall time
+    #     print(f"\nInference 2 phase completed. Time taken: {time.time()-startTime:.3} seconds.")
+    #     print('-----------------------------------------------------------------')
+
+    # def infer2Setup(self,M_infer,randFlag,randMin,randMax):
+    #     self.r_infer2 = np.ones((self.r.shape[0],M_infer))
+    #     self.r_infer2[:self.N,0] = self.step(self.r[:self.N,-1],self.W@self.r[:,-1])
+    #     # randFlag for testing sychronization
+    #     if randFlag == True:
+    #         print("Perturbing Reservoir States...")
+    #         self.r_infer2[:self.N,0] += np.random.uniform(low=randMin,high=randMax,size=self.N)
+
+    # def inferImplicitSetup(self,M_infer,randFlag,randMin,randMax):
+    #     self.r_inferImplicit = np.ones((self.r.shape[0],M_infer))
+    #     self.r_inferImplicit[:self.N,0] = self.step(self.r[:self.N,-1],self.W@self.r[:,-1])
+    #     # randFlag for testing sychronization
+    #     if randFlag == True:
+    #         print("Perturbing Reservoir States...")
+    #         self.r_inferImplicit[:self.N,0] += np.random.uniform(low=randMin,high=randMax,size=self.N)
             
-# Miscellaneous Function
+    # # Miscellaneous Function
     # def consistencyImplicit(self,rTemp,rTemp2,yTemp):
     #     return rTemp2-self.step(rTemp,self.W@rTemp)
 
-    def consistencyImplicit(self,rTemp,yDrive,driveIndex):
-        if self.bias:
-            yTemp = self.W@np.hstack((rTemp,1))
-            yTemp[driveIndex] = np.copy(yDrive)
-            return self.step(rTemp[:self.N],yTemp)-self.step(rTemp[:self.N],self.W@np.hstack((rTemp,1)))
-        else:
-            yTemp = self.W@rTemp
-            yTemp[driveIndex] = np.copy(yDrive)
-            return self.step(rTemp,yTemp)-self.step(rTemp,self.W@rTemp)
+    # def consistencyImplicit(self,rTemp,y_drive,driveIndex):
+    #     if self.bias:
+    #         yTemp = self.W@np.hstack((rTemp,1))
+    #         yTemp[driveIndex] = np.copy(y_drive)
+    #         return self.step(rTemp[:self.N],yTemp)-self.step(rTemp[:self.N],self.W@np.hstack((rTemp,1)))
+    #     else:
+    #         yTemp = self.W@rTemp
+    #         yTemp[driveIndex] = np.copy(y_drive)
+    #         return self.step(rTemp,yTemp)-self.step(rTemp,self.W@rTemp)
 
     def progressBar(self,i,N):  
         if i%62 == 0:
@@ -374,8 +404,8 @@ class Reservoir():
     def inferPC(self,y,start=0,end=-1):
         D,M = y.shape
         yy = y - np.swapaxes([np.mean(y,axis=1)],0,1)
-        yInfer = self.yInfer -np.swapaxes([np.mean(self.yInfer,axis=1)],0,1)
-        return (yInfer@yy.T)**2/((yInfer@yInfer.T)*(yy@yy.T))
+        y_infer = self.y_infer -np.swapaxes([np.mean(self.y_infer,axis=1)],0,1)
+        return (y_infer@yy.T)**2/((y_infer@y_infer.T)*(yy@yy.T))
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 ## mapRC subclass ##
@@ -384,8 +414,8 @@ It is defined by a forward map, which gives it a simpler structure.
 The mapRC class has its own step() function.
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 class mapRC(Reservoir):
-    def __init__(self,N,D,activ=np.tanh,bias=False):
-        super().__init__(N,D,activ=activ,bias=bias)
+    def __init__(self,N,activ=np.tanh,bias=False):
+        super().__init__(N,activ=activ,bias=bias)
         print('-----------------------------------------------------------------')
         print("Forward Map Reservoir initiated.")
 
@@ -405,10 +435,10 @@ be specified, in addition to the usual parameters.
 The diffRC class has its own step() function.
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 class diffRC(Reservoir):
-    def __init__(self,N,D,ds,activ=np.tanh,bias=False):
+    def __init__(self,N,ds,activ=np.tanh,bias=False):
         self.ds = ds
         self.integrator = self.RK2
-        super().__init__(N,D,activ=activ,bias=bias)
+        super().__init__(N,activ=activ,bias=bias)
         print('-----------------------------------------------------------------')
         print("Differential Reservoir initiated.")
 
