@@ -17,6 +17,7 @@ Created on Mon Oct 10
     A           -   adjacency/connection matrix with spectral radius rho
     rho         -   spectral radius
     density     -   percentage of non-zero nodes in A
+    degree      -   number of connections per node in A
 
     # Input Matrix and Parameters
     B           -   input weight matrix (unnormalized)
@@ -89,6 +90,7 @@ class Reservoir():
         self.A          = None
         self.rho        = None
         self.density    = None
+        self.degree     = None
         # parameters for driver
         self.B          = None
         self.sigma      = None
@@ -106,24 +108,49 @@ class Reservoir():
         self.y_echo     = None
 
 # Setup Functions for Matrices
-    def makeConnectionMat(self,rho,density=0.02,zeroDiag=False,dist=statsUniform,loc=-1.0,scale=2.0):
+    def makeConnectionMat(self,rho,degree=3,diag_vals=None,dist=statsUniform,loc=-1.0,scale=2.0):
         # connection matrix is currently constructed based on sparsity, but will be updated to be based on degree in the future
         # dist options: stats.uniform or stats.normal
         # default is uniform in range [-1,1), otherwise [loc,loc+scale)
         # normal distribution is N(loc,scale)
         self.rho = rho
-        self.density = density
-        self.A = sparseRandom(self.N, self.N, density = self.density, data_rvs = dist(loc,scale).rvs)
-        # zero diagonal option
-        if zeroDiag:
-            self.A.setdiag(0)
+        self.degree = min(degree,self.N)
+        # masking matrix
+        mask = np.zeros((self.N,self.N))
+        for i in range(self.N):
+            idx = np.rint(np.random.random(degree)*(self.N-1)).astype(int)
+            mask[i,idx]=1
+        # elementwise random*mask as a sparse matrix
+        self.A = sparseCsrMatrix(np.random.rand(self.N, self.N)*mask)
+        # filling diagonal option
+        if diag_vals != None:
+            self.A.setdiag(diag_vals)
             self.A.eliminate_zeros()
         # find spectral radius, i.e. Largest Magnitude (LM) eigenvalue
         maxEig = np.abs(eigs(self.A, k = 1, which='LM', return_eigenvectors=False))
-        # maxEig = svds(self.A, k = 1, which='LM', return_singular_vectors=False)
+        # maxEig = svds(A, k = 1, which='LM', return_singular_vectors=False)
         # rescale to specified spectral radius
-        self.A = self.A.multiply(self.rho/maxEig)
+        self.A = self.A.multiply(rho/maxEig)
         print("Connection matrix is setup.")
+
+    # def makeConnectionMat(self,rho,density=0.02,zeroDiag=False,dist=statsUniform,loc=-1.0,scale=2.0):
+    #     # connection matrix is currently constructed based on sparsity, but will be updated to be based on degree in the future
+    #     # dist options: stats.uniform or stats.normal
+    #     # default is uniform in range [-1,1), otherwise [loc,loc+scale)
+    #     # normal distribution is N(loc,scale)
+    #     self.rho = rho
+    #     self.density = density
+    #     self.A = sparseRandom(self.N, self.N, density = self.density, data_rvs = dist(loc,scale).rvs)
+    #     # zero diagonal option
+    #     if zeroDiag:
+    #         self.A.setdiag(0)
+    #         self.A.eliminate_zeros()
+    #     # find spectral radius, i.e. Largest Magnitude (LM) eigenvalue
+    #     maxEig = np.abs(eigs(self.A, k = 1, which='LM', return_eigenvectors=False))
+    #     # maxEig = svds(self.A, k = 1, which='LM', return_singular_vectors=False)
+    #     # rescale to specified spectral radius
+    #     self.A = self.A.multiply(self.rho/maxEig)
+    #     print("Connection matrix is setup.")
         
     def makeDiagConnectionMat(self,rho=1,randMin=-1.0,randMax=1.0):
         # default is uniform in range [-1,1)
@@ -148,23 +175,6 @@ class Reservoir():
             for i in range(self.N):
                 self.B[i] = self.sigma*self.B[i]/np.linalg.norm(self.B[i])   
         print("Input matrix is setup.")
-        
-    # def makeInputMat(self,sigma,randMin=-1.0,randMax=1.0,sparseFlag=True):
-    #     # dist options: np.random.uniform or np.random.normal
-    #     # default is uniform in range [0,1), otherwise [randMin,randMax)
-    #     # this uniform function is different from the one used in makeConnectionMat()
-    #     self.sigma = sigma
-    #     # either sparse or full option
-    #     if sparseFlag:
-    #         row = np.arange(self.N)
-    #         col = np.sort(np.argmax(np.random.rand(self.N, self.D), axis = 1)) # chooses one of D inputs
-    #         val = self.sigma*np.random.uniform(low=randMin,high=randMax,size=self.N)
-    #         self.B = sparseCsrMatrix((val, (row, col)), shape=(self.N, self.D))
-    #     else:
-    #         self.B = np.random.random(size=(self.N,self.D))
-    #         for i in range(self.N):
-    #             self.B[i] = self.sigma*self.B[i]/np.linalg.norm(self.B[i])   
-    #     print("Input matrix is setup.")
 
 # Listening Functions
     def listen(self,y_in,randFlag=False,randMin=-1.5,randMax=1.5):
