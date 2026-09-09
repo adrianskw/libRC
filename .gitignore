@@ -1,1 +1,4 @@
 /RQRS/
+__pycache__/
+*.pyc
+.pytest_cache/

@@ -108,7 +108,7 @@ class Reservoir():
         self.y_echo     = None
 
 # Setup Functions for Matrices
-    def makeConnectionMat(self,rho,degree=3,diag_vals=None,dist=statsUniform,loc=-1.0,scale=2.0):
+    def makeConnectionMatDegree(self,rho,degree=3,diag_vals=None,dist=statsUniform,loc=-1.0,scale=2.0):
         # connection matrix is currently constructed based on sparsity, but will be updated to be based on degree in the future
         # dist options: stats.uniform or stats.normal
         # default is uniform in range [-1,1), otherwise [loc,loc+scale)
@@ -118,39 +118,39 @@ class Reservoir():
         # masking matrix
         mask = np.zeros((self.N,self.N))
         for i in range(self.N):
-            idx = np.rint(np.random.random(degree)*(self.N-1)).astype(int)
+            idx = np.random.choice(np.arange(self.N),replace=False,size=self.degree)
             mask[i,idx]=1
         # elementwise random*mask as a sparse matrix
-        self.A = sparseCsrMatrix(np.random.rand(self.N, self.N)*mask)
+        self.A = sparseCsrMatrix(dist(loc,scale).rvs(size=(self.N, self.N))*mask)
         # filling diagonal option
-        if diag_vals != None:
+        if diag_vals is not None:
             self.A.setdiag(diag_vals)
             self.A.eliminate_zeros()
         # find spectral radius, i.e. Largest Magnitude (LM) eigenvalue
-        maxEig = np.abs(eigs(self.A, k = 1, which='LM', return_eigenvectors=False))
+        maxEig = float(np.abs(eigs(self.A, k = 1, which='LM', return_eigenvectors=False))[0])
         # maxEig = svds(A, k = 1, which='LM', return_singular_vectors=False)
         # rescale to specified spectral radius
-        self.A = self.A.multiply(rho/maxEig)
+        self.A = self.A.multiply(rho/maxEig).tocsr()
         print("Connection matrix is setup.")
 
-    # def makeConnectionMat(self,rho,density=0.02,zeroDiag=False,dist=statsUniform,loc=-1.0,scale=2.0):
-    #     # connection matrix is currently constructed based on sparsity, but will be updated to be based on degree in the future
-    #     # dist options: stats.uniform or stats.normal
-    #     # default is uniform in range [-1,1), otherwise [loc,loc+scale)
-    #     # normal distribution is N(loc,scale)
-    #     self.rho = rho
-    #     self.density = density
-    #     self.A = sparseRandom(self.N, self.N, density = self.density, data_rvs = dist(loc,scale).rvs)
-    #     # zero diagonal option
-    #     if zeroDiag:
-    #         self.A.setdiag(0)
-    #         self.A.eliminate_zeros()
-    #     # find spectral radius, i.e. Largest Magnitude (LM) eigenvalue
-    #     maxEig = np.abs(eigs(self.A, k = 1, which='LM', return_eigenvectors=False))
-    #     # maxEig = svds(self.A, k = 1, which='LM', return_singular_vectors=False)
-    #     # rescale to specified spectral radius
-    #     self.A = self.A.multiply(self.rho/maxEig)
-    #     print("Connection matrix is setup.")
+    def makeConnectionMatDensity(self,rho,density=0.02,diag_vals=None,dist=statsUniform,loc=-1.0,scale=2.0):
+        # connection matrix is currently constructed based on sparsity, but will be updated to be based on degree in the future
+        # dist options: stats.uniform or stats.normal
+        # default is uniform in range [-1,1), otherwise [loc,loc+scale)
+        # normal distribution is N(loc,scale)
+        self.rho = rho
+        self.density = density
+        self.A = sparseRandom(self.N, self.N, density = self.density, data_rvs = dist(loc,scale).rvs)
+        # filling diagonal option
+        if diag_vals is not None:
+            self.A.setdiag(diag_vals)
+            self.A.eliminate_zeros()
+        # find spectral radius, i.e. Largest Magnitude (LM) eigenvalue
+        maxEig = float(np.abs(eigs(self.A, k = 1, which='LM', return_eigenvectors=False))[0])
+        # maxEig = svds(self.A, k = 1, which='LM', return_singular_vectors=False)
+        # rescale to specified spectral radius
+        self.A = self.A.multiply(self.rho/maxEig).tocsr()
+        print("Connection matrix is setup.")
         
     def makeDiagConnectionMat(self,rho=1,randMin=-1.0,randMax=1.0):
         # default is uniform in range [-1,1)
@@ -167,13 +167,10 @@ class Reservoir():
         self.D = D
         self.sigma = sigma
         # either sparse or full option
+        self.B = self.sigma*np.random.uniform(low=randMin,high=randMax,size=(self.N,self.D))
         if sparseFlag:
-            val = self.sigma*np.random.uniform(low=randMin,high=randMax,size=self.N)
-            self.B = sparseCsrMatrix((val, (np.arange(self.N), np.sort(np.arange(self.N)%self.D))), shape=(self.N, self.D))
-        else:
-            self.B = np.random.random(size=(self.N,self.D))
-            for i in range(self.N):
-                self.B[i] = self.sigma*self.B[i]/np.linalg.norm(self.B[i])   
+            # can add a sort behind the second np.arange to give it a block structure
+            self.B = sparseCsrMatrix((self.B[np.arange(self.N), np.arange(self.N)%self.D], (np.arange(self.N), np.arange(self.N)%self.D)), shape=(self.N, self.D))
         print("Input matrix is setup.")
 
 # Listening Functions
@@ -192,21 +189,9 @@ class Reservoir():
         #setup
         self.listenSetup(randFlag,randMin,randMax)
         # listening main loop
-        self.M = y_in.shape[1]
         for i in range(1,self.M):
             self.r[:,i] = self.step(self.r[:,i-1],y_in[:,i-1])
             self.progressBar(i,self.M)
-        # if len(y_in.shape)>1:
-        #     self.M = y_in.shape[1]
-        #     for i in range(1,self.M):
-        #         self.r[:,i] = self.step(self.r[:,i-1],y_in[:,i-1])
-        #         self.progressBar(i,self.M)
-        # else:
-        #     self.M = len(y_in)
-        #     for i in range(1,self.M):
-        #         self.r[:,i] = self.step(self.r[:,i-1],y_in[i-1])
-        #         self.progressBar(i,self.M)
-        # wall time
         print(f"\nListening phase completed. Time taken: {time.time()-startTime:.3} seconds.")
         print('-----------------------------------------------------------------')
 
@@ -220,20 +205,18 @@ class Reservoir():
 
 # Training with Linear Fit
     def train(self,y_target,start=0,end=None,alpha=0.02,mask=None):
-        if mask == None:
+        if mask is None:
             if y_target.shape[0] != self.D:
                 print("Mismatch in input vs target dimensions. Mask required. Halting code.")
                 return -1
             self.mask = np.eye(self.D)
         else:
             self.mask = mask
-
-
         # small hack to make default 'end' from class variables
         if end is None:
             end = self.M
         # adding bias term
-        if self.bias:
+        if self.bias and self.r.shape[0] == self.N:
             self.r = np.vstack([self.r,np.ones(self.M)])
         # alpha is the regularization parameter of ridge regression
         self.alpha = alpha
