@@ -90,6 +90,56 @@ class TestMakeConnectionMatDensity:
         assert isinstance(RC.A, csr_matrix)
 
 
+class TestRngInjection:
+    """An explicit `rng` makes construction reproducible independent of
+    global np.random state."""
+
+    def test_degree_rng_reproducible_without_global_seed(self):
+        N = 25
+        RC1 = make_reservoir(N)
+        RC1.makeConnectionMatDegree(rho=0.8, degree=4, rng=np.random.default_rng(123))
+        RC2 = make_reservoir(N)
+        RC2.makeConnectionMatDegree(rho=0.8, degree=4, rng=np.random.default_rng(123))
+        np.testing.assert_allclose(RC1.A.toarray(), RC2.A.toarray())
+
+    def test_density_rng_reproducible_without_global_seed(self):
+        N = 25
+        RC1 = make_reservoir(N)
+        RC1.makeConnectionMatDensity(rho=0.8, density=0.1, rng=np.random.default_rng(123))
+        RC2 = make_reservoir(N)
+        RC2.makeConnectionMatDensity(rho=0.8, density=0.1, rng=np.random.default_rng(123))
+        np.testing.assert_allclose(RC1.A.toarray(), RC2.A.toarray())
+
+    def test_input_mat_rng_reproducible_without_global_seed(self):
+        N, D = 20, 3
+        RC1 = make_reservoir(N)
+        RC1.makeInputMat(D=D, sigma=0.5, rng=np.random.default_rng(7))
+        RC2 = make_reservoir(N)
+        RC2.makeInputMat(D=D, sigma=0.5, rng=np.random.default_rng(7))
+        np.testing.assert_allclose(RC1.B.toarray(), RC2.B.toarray())
+
+    def test_different_rng_seeds_give_different_matrices(self):
+        N = 25
+        RC1 = make_reservoir(N)
+        RC1.makeConnectionMatDegree(rho=0.8, degree=4, rng=np.random.default_rng(1))
+        RC2 = make_reservoir(N)
+        RC2.makeConnectionMatDegree(rho=0.8, degree=4, rng=np.random.default_rng(2))
+        assert not np.allclose(RC1.A.toarray(), RC2.A.toarray())
+
+
+class TestSpectralRadiusErrorHandling:
+    def test_non_convergence_raises_informative_error(self):
+        from libRC.connectivity import _spectralRadius
+        from scipy.sparse import csr_matrix
+        from scipy.sparse.linalg import ArpackNoConvergence
+        from unittest.mock import patch
+
+        A = csr_matrix(np.eye(10))
+        with patch("libRC.connectivity.eigs", side_effect=ArpackNoConvergence("no convergence", [], [])):
+            with pytest.raises(RuntimeError, match="failed to converge"):
+                _spectralRadius(A)
+
+
 class TestSharedSignature:
     """Both builders now share the same (diag_vals, dist, loc, scale) dialect (issue #10)."""
 
