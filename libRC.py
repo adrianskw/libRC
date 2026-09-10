@@ -115,13 +115,13 @@ class Reservoir():
         # normal distribution is N(loc,scale)
         self.rho = rho
         self.degree = min(degree,self.N)
-        # masking matrix
-        mask = np.zeros((self.N,self.N))
+        # sample degree distinct column indices per row directly, avoiding an NxN dense mask
+        rows = np.repeat(np.arange(self.N),self.degree)
+        cols = np.empty(self.N*self.degree,dtype=int)
         for i in range(self.N):
-            idx = np.random.choice(np.arange(self.N),replace=False,size=self.degree)
-            mask[i,idx]=1
-        # elementwise random*mask as a sparse matrix
-        self.A = sparseCsrMatrix(dist(loc,scale).rvs(size=(self.N, self.N))*mask)
+            cols[i*self.degree:(i+1)*self.degree] = np.random.choice(np.arange(self.N),replace=False,size=self.degree)
+        vals = dist(loc,scale).rvs(size=self.N*self.degree)
+        self.A = sparseCsrMatrix((vals,(rows,cols)),shape=(self.N,self.N))
         # filling diagonal option
         if diag_vals is not None:
             self.A.setdiag(diag_vals)
@@ -167,10 +167,14 @@ class Reservoir():
         self.D = D
         self.sigma = sigma
         # either sparse or full option
-        self.B = self.sigma*np.random.uniform(low=randMin,high=randMax,size=(self.N,self.D))
         if sparseFlag:
             # can add a sort behind the second np.arange to give it a block structure
-            self.B = sparseCsrMatrix((self.B[np.arange(self.N), np.arange(self.N)%self.D], (np.arange(self.N), np.arange(self.N)%self.D)), shape=(self.N, self.D))
+            rows = np.arange(self.N)
+            cols = rows%self.D
+            vals = self.sigma*np.random.uniform(low=randMin,high=randMax,size=self.N)
+            self.B = sparseCsrMatrix((vals,(rows,cols)),shape=(self.N,self.D))
+        else:
+            self.B = self.sigma*np.random.uniform(low=randMin,high=randMax,size=(self.N,self.D))
         print("Input matrix is setup.")
 
 # Listening Functions
