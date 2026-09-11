@@ -22,7 +22,7 @@ from scipy.sparse.linalg import eigs
 from scipy.stats import uniform as statsUniform
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from libRC import mapRC
+from src import mapRC
 
 
 # ---------------------------------------------------------------------------

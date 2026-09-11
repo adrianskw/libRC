@@ -1,6 +1,6 @@
 import numpy as np
 
-from libRC import mapRC, diffRC
+from src import mapRC, diffRC
 
 
 def synthetic_signal(D=2, M=300, seed=0):

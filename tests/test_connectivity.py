@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from scipy.sparse import csr_matrix
 
-from libRC import mapRC
+from src import mapRC
 
 
 def make_reservoir(N):
@@ -129,13 +129,13 @@ class TestRngInjection:
 
 class TestSpectralRadiusErrorHandling:
     def test_non_convergence_raises_informative_error(self):
-        from libRC.connectivity import _spectralRadius
+        from src.connectivity import _spectralRadius
         from scipy.sparse import csr_matrix
         from scipy.sparse.linalg import ArpackNoConvergence
         from unittest.mock import patch
 
         A = csr_matrix(np.eye(10))
-        with patch("libRC.connectivity.eigs", side_effect=ArpackNoConvergence("no convergence", [], [])):
+        with patch("src.connectivity.eigs", side_effect=ArpackNoConvergence("no convergence", [], [])):
             with pytest.raises(RuntimeError, match="failed to converge"):
                 _spectralRadius(A)
 
