@@ -13,7 +13,7 @@ Presets (same script, only flags differ):
   z1-drive   --channels z1,z2,z3,id   --drive z1   (how well is Id itself inferred)
 
 Usage: python rc_with_id.py [--latent-dim 3] [--n-res 200] [--channels ...]
-                            [--drive ...] [--id-smooth W] [--seed S] [--tag NAME] [--no-decode]
+                            [--drive ...] [--id-smooth W] [--seed S] [--variant V] [--tag NAME] [--no-decode]
 Output: latent{D}/n{N}/rc_{tag}/{config.json, metrics.json, results.npz, *.png}
 """
 import argparse
@@ -28,6 +28,7 @@ import matplotlib.pyplot as plt
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, REPO_ROOT)
 from src import mapRC, observables  # noqa: E402
+from src.metrics import period_steps  # noqa: E402
 
 BASE = os.path.join(REPO_ROOT, "HPHall-data-Summer24")
 
@@ -44,6 +45,7 @@ ap.add_argument("--channels", default="z1,z2,z3,id", help="comma list: z1..zD an
 ap.add_argument("--drive", default="id", help="comma list of channels observed during infer")
 ap.add_argument("--id-smooth", type=int, default=0, help="causal moving-average window (steps) on 'id'; 0 = off")
 ap.add_argument("--seed", type=int, default=0, help="RNG seed for the reservoir draw (train_rc.py uses 0)")
+ap.add_argument("--variant", default="", help="use the AE variant in latent{D}_{variant}/ (see train_ae_id.py)")
 ap.add_argument("--tag", default=None)
 ap.add_argument("--no-decode", action="store_true", help="skip decoding to physical fields")
 args = ap.parse_args()
@@ -55,7 +57,7 @@ if not set(drive) <= set(channels):
 SEED = args.seed
 tag = args.tag or (f"{'-'.join(channels)}_drive-{'-'.join(drive)}" + (f"_smooth{args.id_smooth}" if args.id_smooth else "")
                    + (f"_seed{SEED}" if SEED else ""))
-OUT_DIR = f"{BASE}/latent{args.latent_dim}"
+OUT_DIR = f"{BASE}/latent{args.latent_dim}" + (f"_{args.variant}" if args.variant else "")
 RUN_DIR = f"{OUT_DIR}/n{args.n_res}/rc_{tag}"
 os.makedirs(RUN_DIR, exist_ok=True)
 
@@ -109,6 +111,16 @@ for i, name in enumerate(channels):
     metrics["per_channel"][name] = {"echo_rmse": float(echo_rmse[i]), "infer_rmse": float(infer_rmse[i]), "infer_pc": pc}
     print(f"  {name:6s}  {echo_rmse[i]:9.3f}  {infer_rmse[i]:10.3f}  " + ("  (driven)" if pc is None else f"{pc:8.3f}"))
 
+# ---- breathing-mode period of the free run vs. the truth (the report's echo metric) ----
+if "z1" in channels:
+    p_true, _ = period_steps(y_val[channels.index("z1")])
+    p_echo, n_echo_peaks = period_steps(RC.y_echo[channels.index("z1")])
+    metrics["echo_period"] = {"true_steps": p_true, "echo_steps": p_echo, "echo_peaks": n_echo_peaks,
+                              "mismatch_pct": None if np.isnan(p_echo) else float(100 * abs(p_echo - p_true) / p_true)}
+    tail = slice(n_val // 2, None)   # a free run that has collapsed to a fixed point has ~0 spread here
+    metrics["echo_tail_std_ratio"] = float(RC.y_echo[:, tail].std(axis=1).mean() / y_val[:, tail].std(axis=1).mean())
+    print(f"echo period: true {p_true:.1f} steps, echo {p_echo:.1f} steps; echo/true late-run spread {metrics['echo_tail_std_ratio']:.2f}")
+
 # ---- decode to physical fields (only meaningful when all latents are in the state) ----
 latent_names = [f"z{i + 1}" for i in range(args.latent_dim)]
 if not args.no_decode and all(n in channels for n in latent_names):
@@ -153,7 +165,7 @@ try:
 except Exception:
     git_rev = None
 config = {"tag": tag, "latent_dim": args.latent_dim, "n_res": args.n_res, "channels": channels, "drive": drive,
-          "id_smooth": args.id_smooth, "seed": SEED, "rho": RHO, "degree": DEGREE, "alpha": ALPHA,
+          "id_smooth": args.id_smooth, "variant": args.variant, "seed": SEED, "rho": RHO, "degree": DEGREE, "alpha": ALPHA,
           "train_skip": TRAIN_SKIP, "sigma": float(sigma), "n_train": n_train, "git_rev": git_rev,
           "command": " ".join(sys.argv)}
 with open(f"{RUN_DIR}/config.json", "w") as f:
