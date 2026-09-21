@@ -8,6 +8,7 @@ HPHall-data-Summer24/scripts/.
 
 @author: Adrian Wong
 """
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -68,3 +69,32 @@ def load_checkpoint(path, device=None):
         model = model.to(device)
     model.eval()
     return model, ckpt
+
+
+def decode_to_fields(model, ckpt, z, device=None, chunk=1000):
+    """Raw AE latents (n, latent_dim) -> physical fields (n, C, 25, 50).
+
+    Runs the frozen decoder in chunks, then undoes the z-score and the log10 applied
+    to ckpt["log_fields"] during training.
+    """
+    field_names = [str(s) for s in ckpt["field_names"]]
+    log_fields = set(ckpt["log_fields"])
+    out = np.empty((z.shape[0], len(field_names), 25, 50), dtype=np.float32)
+    for i in range(0, z.shape[0], chunk):
+        zt = torch.from_numpy(np.ascontiguousarray(z[i:i + chunk])).float()
+        if device is not None:
+            zt = zt.to(device)
+        with torch.no_grad():
+            norm = model.decode(zt).cpu().numpy()
+        phys = norm * ckpt["std"] + ckpt["mean"]
+        for c, name in enumerate(field_names):
+            if name in log_fields:
+                phys[:, c] = 10 ** phys[:, c]
+        out[i:i + chunk] = phys
+    return out
+
+
+def relative_field_error(recon, true):
+    """Per-field mean relative error, mean|recon - true| / mean|true|, over frames and pixels."""
+    rel = np.abs(recon - true) / (np.abs(true).mean(axis=(0, 2, 3), keepdims=True) + 1e-30)
+    return rel.mean(axis=(0, 2, 3))

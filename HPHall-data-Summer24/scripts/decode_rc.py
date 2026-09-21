@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, REPO_ROOT)
-from src.autoencoder import load_checkpoint  # noqa: E402
+from src.autoencoder import load_checkpoint, decode_to_fields, relative_field_error  # noqa: E402
 
 BASE = os.path.join(REPO_ROOT, "HPHall-data-Summer24")
 LATENT_DIM = int(sys.argv[1]) if len(sys.argv) > 1 else 3
@@ -31,20 +31,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # ---- frozen AE decoder ----
 model, ckpt = load_checkpoint(f"{OUT_DIR}/conv_ae_full.pt", device=device)
-field_mean, field_std = ckpt["mean"], ckpt["std"]
-log_fields = set(ckpt["log_fields"])
 field_names = list(ckpt["field_names"])
-
-
-def decode_latent(z_ae):
-    """z_ae: (n,3) raw AE-latent-space array -> (n,7,25,50) physical fields."""
-    with torch.no_grad():
-        norm = model.decode(torch.from_numpy(z_ae).float().to(device)).cpu().numpy()
-    phys = norm * field_std + field_mean
-    for c, name in enumerate(field_names):
-        if name in log_fields:
-            phys[:, c] = 10 ** phys[:, c]
-    return phys
 
 
 # ---- RC latent predictions (still in RC's own z-scored space) ----
@@ -67,21 +54,13 @@ true_fields = np.asarray(ds["data"][n_train:n_train + n_val])   # (n_val,7,25,50
 x, y = np.asarray(ds["x"]), np.asarray(ds["y"])
 
 # ---- decode all three in chunks ----
-def decode_chunked(z, chunk=1000):
-    out = np.empty((z.shape[0], len(field_names), 25, 50), dtype=np.float32)
-    for i in range(0, z.shape[0], chunk):
-        out[i:i + chunk] = decode_latent(z[i:i + chunk])
-    return out
-
-
-recon_true_latent = decode_chunked(z_true)   # AE's own round-trip error only (no RC involved) -- baseline
-recon_infer = decode_chunked(z_infer)
-recon_echo = decode_chunked(z_echo)
+recon_true_latent = decode_to_fields(model, ckpt, z_true, device)   # AE's own round-trip error only (no RC involved) -- baseline
+recon_infer = decode_to_fields(model, ckpt, z_infer, device)
+recon_echo = decode_to_fields(model, ckpt, z_echo, device)
 
 # ---- per-field relative error, full val window ----
 def field_err(recon, true=true_fields):
-    rel = np.abs(recon - true) / (np.abs(true).mean(axis=(0, 2, 3), keepdims=True) + 1e-30)
-    return rel.mean(axis=(0, 2, 3))
+    return relative_field_error(recon, true)
 
 
 err_baseline = field_err(recon_true_latent)

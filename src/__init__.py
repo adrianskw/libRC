@@ -56,12 +56,15 @@ simulation frames into the latent trajectories the reservoir is trained on
 @author: Adrian Wong
 """
 from .reservoir import Reservoir, mapRC, diffRC
-from .autoencoder import ConvAE, save_checkpoint, load_checkpoint
+from .autoencoder import (ConvAE, save_checkpoint, load_checkpoint,
+                          decode_to_fields, relative_field_error)
 from . import connectivity
 from . import integrators
+from . import observables
 
 __all__ = [
     "Reservoir", "mapRC", "diffRC",
     "ConvAE", "save_checkpoint", "load_checkpoint",
-    "connectivity", "integrators",
+    "decode_to_fields", "relative_field_error",
+    "connectivity", "integrators", "observables",
 ]
