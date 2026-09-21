@@ -101,7 +101,7 @@ footer a{color:var(--text-muted);}
   <header class="narrow">
     <p class="eyebrow">Technical report &middot; Hall-thruster latent dynamics</p>
     <h1>Embedding the Breathing Mode</h1>
-    <p class="dek">A convolutional autoencoder compresses a Hall-thruster plasma simulation into a handful of numbers; a small reservoir computer learns to run their dynamics on its own. Three latent numbers are enough to reproduce the discharge's breathing-mode limit cycle. Two are not &mdash; and the reason is topological, not statistical.</p>
+    <p class="dek">A convolutional autoencoder compresses a Hall-thruster plasma simulation into a handful of numbers; a small reservoir computer learns to run their dynamics on its own. Three latent numbers are enough to reproduce the discharge's breathing-mode limit cycle; two cannot (<a href="#appendix-2d">Appendix&nbsp;A</a>).</p>
     <div class="byline">
       <span>adrianskw / AE&#8209;RC</span>
       <span>HPHall-data-Summer24</span>
@@ -112,7 +112,7 @@ footer a{color:var(--text-muted);}
   <div class="narrow">
     <div class="abstract">
       <p class="label">Summary</p>
-      <p>A 7-field, 50&times;25 plasma fluid simulation (20,000 frames, 1&nbsp;ms of a breathing-mode oscillation) is compressed by a convolutional autoencoder into a 3-number latent trajectory. A 200-node reservoir computer, driven only by that 3-number series, learns to reproduce the oscillation on its own: run with no external input at all, it free-runs the correct limit-cycle shape at the correct frequency to within 3.4%. Repeating the entire pipeline with a 2-number latent space instead gives an autoencoder that is <i>almost as accurate</i> at static reconstruction &mdash; but whose latent trajectory self-intersects, and whose reservoir cannot sustain an autonomous oscillation at all: it collapses to a fixed point. Three latent variables are not an arbitrary round number here; they appear to be the minimum needed to embed this attractor without ambiguity.</p>
+      <p>A 7-field, 50&times;25 plasma fluid simulation (20,000 frames, 1&nbsp;ms of a breathing-mode oscillation) is compressed by a convolutional autoencoder into a 3-number latent trajectory. A 200-node reservoir computer, driven only by that 3-number series, learns to reproduce the oscillation on its own: run with no external input at all, it free-runs the correct limit-cycle shape at the correct frequency to within 3.4%. A 2-number latent space cannot support this (<a href="#appendix-2d">Appendix&nbsp;A</a>): its reservoir collapses to a fixed point, as the Poincar&eacute;&ndash;Bendixson theorem requires of any autonomous flow in the plane. Three is the minimum latent dimension that embeds this attractor without ambiguity.</p>
     </div>
   </div>
 
@@ -121,10 +121,9 @@ footer a{color:var(--text-muted);}
     <ol>
       <li><a href="#background">Background &amp; pipeline</a></li>
       <li><a href="#three-latent">Results: three latent variables</a></li>
-      <li><a href="#two-latent">Results: two latent variables</a></li>
-      <li><a href="#comparison">Side-by-side comparison</a></li>
       <li><a href="#discussion">Why three? An embedding-dimension argument</a></li>
       <li><a href="#conclusion">Conclusion</a></li>
+      <li><a href="#appendix-2d">Appendix A: the two-latent case</a></li>
     </ol>
   </nav>
 
@@ -136,12 +135,12 @@ footer a{color:var(--text-muted);}
         <p>The pipeline has three stages, and the autoencoder and reservoir are trained and evaluated completely separately:</p>
         <div class="pipeline">field grid <b>(7&times;25&times;50)</b>
    &#8595;  <b>[ frozen conv-autoencoder encoder ]</b>
-latent vector <b>z &isin; R^D</b>   (D = 3, or D = 2 for comparison)
+latent vector <b>z &isin; R^D</b>   (D = 3)
    &#8595;  <b>[ reservoir computer, N = 200 nodes ]</b>
 predicted latent <b>&#7825;</b>   (driven, or fully autonomous)
    &#8595;  <b>[ same frozen autoencoder, decoder half ]</b>
 predicted field grid <b>(7&times;25&times;50)</b></div>
-        <p>The autoencoder is a small 3-layer convolutional encoder/decoder (89,034 trainable parameters for D&#8201;=&#8201;3; 77,385 for D&#8201;=&#8201;2 &mdash; the difference is entirely in the two linear layers either side of the bottleneck). It was trained in two passes: 200 epochs on a 2,000-frame subsample, then warm-started and fine-tuned for 60 more epochs on the complete 20,000-frame run. All splits are <b>chronological</b> (85% / 15%, i.e. the last 3,000 frames are held out) rather than random, so "generalizes" means "extrapolates to unseen future cycles," not just interpolates.</p>
+        <p>The autoencoder is a small 3-layer convolutional encoder/decoder (89,034 trainable parameters for D&#8201;=&#8201;3). It was trained in two passes: 200 epochs on a 2,000-frame subsample, then warm-started and fine-tuned for 60 more epochs on the complete 20,000-frame run. All splits are <b>chronological</b> (85% / 15%, i.e. the last 3,000 frames are held out) rather than random, so "generalizes" means "extrapolates to unseen future cycles," not just interpolates.</p>
         <p>The reservoir is a <a href="https://github.com/adrianskw/libRC"><code>mapRC</code></a> from libRC: 200 nodes, spectral radius 0.9, connection degree 10 (&asymp;5% density), driven by the AE's latent series and fit with ridge regression (&alpha;&#8201;=&#8201;10<sup>-3</sup>). Only the linear readout is trained &mdash; the reservoir's internal connectivity is fixed random weights, so the entire learned system is a D&times;201 matrix (603 numbers for D&#8201;=&#8201;3). Three regimes are tested on the held-out window: <b>listen/train</b> (fit quality while driven by the true signal), <b>echo</b> (disconnect entirely and run autonomously &mdash; the real test of whether the attractor's dynamics were learned), and <b>infer</b> (drive with only <i>z</i><sub>1</sub> and estimate the rest, a partial-observability test).</p>
       </div>
     </section>
@@ -230,7 +229,7 @@ predicted field grid <b>(7&times;25&times;50)</b></div>
       </div>
 
       <div class="narrow">
-        <p style="font-size:13px;color:var(--text-muted);">For reference: repeating this same N=200&rarr;1,000 jump on the 2-latent embedding does <i>not</i> reproduce this improvement. Its autonomous mode stops collapsing to a fixed point, but rather than finding the true limit cycle it settles onto a smaller, offset, spurious one that avoids the self-intersection &mdash; echo RMSE actually gets slightly <i>worse</i> (0.98&rarr;1.17). More capacity fixes an under-fit reservoir; it cannot fix a latent space that is not a valid embedding of the attractor in the first place &mdash; consistent with &sect;5 below.</p>
+        <p style="font-size:13px;color:var(--text-muted);">For reference: repeating this same N=200&rarr;1,000 jump on the 2-latent embedding (<a href="#appendix-2d">Appendix&nbsp;A</a>) does <i>not</i> reproduce this improvement. Its autonomous mode stops collapsing to a fixed point, but rather than finding the true limit cycle it settles onto a smaller, offset, spurious one that avoids the self-intersection &mdash; echo RMSE actually gets slightly <i>worse</i> (0.98&rarr;1.17). More capacity fixes an under-fit reservoir; it cannot fix a latent space that is not a valid embedding of the attractor in the first place &mdash; consistent with &sect;5 below.</p>
       </div>
 
       <div class="narrow">
@@ -333,69 +332,11 @@ predicted field grid <b>(7&times;25&times;50)</b></div>
       </div>
     </section>
 
-    <section id="two-latent">
-      <div class="narrow">
-        <span class="tag tag-rust">&#9679; two latent variables</span>
-        <h2>3. Results: two latent variables</h2>
-        <p>Repeating the identical pipeline with a 2-number latent space (77,385 AE parameters) gives a fine-tuned validation MSE of <b>__FINAL_VAL2__</b> &mdash; only modestly worse than the 3-latent __FINAL_VAL3__. Static per-field errors move by well under a percentage point across the board. By reconstruction accuracy alone, two numbers look almost sufficient.</p>
-      </div>
-
-      <figure class="narrow">
-        <img src="data:image/png;base64,__IMG_LAT2_TRAJ__" alt="2D latent trajectory that self-intersects into a hook shape">
-        <figcaption><b>Fig. 6</b> &mdash; The 2-latent trajectory, all 20,000 frames. Unlike Fig. 1, this is not a clean loop: it <b>self-intersects</b> (visible crossing near z&#8321;&asymp;&minus;1.9, z&#8322;&asymp;&minus;0.4). The same (z&#8321;, z&#8322;) point corresponds to more than one physical state.</figcaption>
-      </figure>
-
-      <div class="fig-row narrow" style="max-width:700px">
-        <figure>
-          <img src="data:image/png;base64,__IMG_LAT2_ATTR__" alt="2-latent echo collapsing to a fixed-point spiral instead of a limit cycle">
-          <figcaption><b>Fig. 7</b> &mdash; Same three-panel comparison as Fig. 3. The autonomous <i>echo</i> trajectory (center) does not sustain any oscillation: it spirals inward and settles at a fixed point.</figcaption>
-        </figure>
-        <figure>
-          <img src="data:image/png;base64,__IMG_LAT2_DECERR__" alt="Decode error flat and elevated from step zero, not growing">
-          <figcaption><b>Fig. 8</b> &mdash; Decoded-field error vs. time. Echo is elevated (&asymp;26&ndash;34%) from step zero and stays flat &mdash; it never had dynamics to drift out of; it was already stuck.</figcaption>
-        </figure>
-      </div>
-
-      <div class="narrow">
-        <div class="callout rust">
-          <p class="label">Key finding</p>
-          <p>The 2-latent reservoir's listen/train fit error (__FIT_ERR2__) is comparable to the 3-latent case, and its driven <i>infer</i> mode still works reasonably (PC&#8201;=&#8201;__PC_Z2_2__ for the unobserved channel, down from 0.978/0.946). But its <i>echo</i> mode fails qualitatively, not just quantitatively: instead of drifting out of phase like the 3-latent case, it never sustains a cycle at all. Collapsing to the mean latent state acts like predicting the time-averaged field &mdash; a statistically sensible fallback that keeps the raw error from looking catastrophic, but it is not the dynamics of a breathing-mode thruster.</p>
-        </div>
-      </div>
-
-      <div class="narrow tblwrap">
-        <table>
-          <thead><tr><th>Field</th><th>AE floor</th><th>RC&#8209;infer</th><th>RC&#8209;echo</th></tr></thead>
-          <tbody>__ROWS2__</tbody>
-        </table>
-      </div>
-    </section>
-
-    <section id="comparison">
-      <div class="narrow">
-        <h2>4. Side-by-side</h2>
-      </div>
-      <div class="narrow tblwrap">
-        <table>
-          <thead><tr><th>Metric</th><th>3 latent (teal)</th><th>2 latent (rust)</th></tr></thead>
-          <tbody>
-            <tr><td>AE parameters</td><td>__N_PARAMS3__</td><td>__N_PARAMS2__</td></tr>
-            <tr><td>Fine-tuned val. MSE</td><td>__FINAL_VAL3__</td><td>__FINAL_VAL2__</td></tr>
-            <tr><td>Latent phase portrait</td><td>clean, non-self-intersecting</td><td class="hl2">self-intersecting</td></tr>
-            <tr><td>RC listen/train fit error</td><td>__FIT_ERR3__</td><td>__FIT_ERR2__</td></tr>
-            <tr><td>RC echo (autonomous) behavior</td><td>sustains cycle, period off __PERIOD_MISMATCH3__%</td><td class="hl2">collapses to fixed point</td></tr>
-            <tr><td>RC echo decode error trend</td><td>climbs 21%&rarr;&gt;50%</td><td class="hl2">flat 26&ndash;34% from t=0</td></tr>
-            <tr><td>RC infer PC (unobserved ch.)</td><td>0.978 / 0.946</td><td>__PC_Z2_2__</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
     <section id="discussion">
       <div class="narrow">
-        <h2>5. Why three? An embedding-dimension argument</h2>
-        <p>The static-reconstruction numbers alone would suggest two latent variables are nearly as good as three. The dynamics say otherwise, and the reason is topological rather than statistical.</p>
-        <p>A simple closed loop &mdash; a single-frequency limit cycle &mdash; can always be drawn in a plane without crossing itself; that is just what a circle is. If the breathing mode were that simple, a 2-latent embedding should have produced a clean loop, the same way the 3-latent one did. It didn't: Fig. 6 shows a genuine self-intersection, meaning two different physical states of the plasma were mapped to the same (z&#8321;, z&#8322;) point. That is not a training failure of the autoencoder &mdash; it is a direct, empirical demonstration that <b>the true attractor is not a simple 1-D circle</b>. It has enough additional structure (weak higher-harmonic content, or a genuinely quasi-periodic rather than strictly periodic character) that no 2-dimensional projection can represent it without ambiguity.</p>
+        <h2>3. Why three? An embedding-dimension argument</h2>
+        <p>The static-reconstruction numbers alone would suggest two latent variables are nearly as good as three (<a href="#appendix-2d">Appendix&nbsp;A</a>). The dynamics say otherwise, and the reason is topological rather than statistical.</p>
+        <p>A simple closed loop &mdash; a single-frequency limit cycle &mdash; can always be drawn in a plane without crossing itself; that is just what a circle is. If the breathing mode were that simple, a 2-latent embedding should have produced a clean loop, the same way the 3-latent one did. It didn't: Fig. A1 shows a genuine self-intersection, meaning two different physical states of the plasma were mapped to the same (z&#8321;, z&#8322;) point. That is not a training failure of the autoencoder &mdash; it is a direct, empirical demonstration that <b>the true attractor is not a simple 1-D circle</b>. It has enough additional structure (weak higher-harmonic content, or a genuinely quasi-periodic rather than strictly periodic character) that no 2-dimensional projection can represent it without ambiguity.</p>
         <p>This is the same obstruction that motivates <b>Takens' delay-embedding theorem</b> in dynamical systems: reconstructing an attractor of intrinsic (box-counting) dimension <i>d</i> from observations generically requires an embedding space of at least 2<i>d</i>&#8201;+&#8201;1 dimensions to guarantee no spurious self-intersections; fewer dimensions fold the attractor over itself. Takens' theorem is stated for delay-coordinate embeddings of a scalar time series, not for a learned autoencoder bottleneck, but the topological argument transfers directly: an embedding is an embedding, however it is constructed, and a 2-dimensional target space cannot faithfully represent an attractor whose effective dimension exceeds 1.</p>
         <p>The reservoir results make the consequence concrete rather than abstract. A learned autonomous map on an ambiguous, self-crossing state space has no consistent vector field to follow at the crossing point &mdash; two different "next states" are equally valid continuations of the same current state. The 2-latent reservoir's response was to settle onto a fixed point that avoids the contradiction altogether, rather than to sustain a cycle that would eventually have to pass back through the ambiguous region. The 3-latent reservoir, given a genuinely unambiguous embedding, had no such obstruction &mdash; and its only remaining error (a 3.4% period mismatch) is an ordinary least-squares fitting imprecision, not a structural one.</p>
       </div>
@@ -403,8 +344,60 @@ predicted field grid <b>(7&times;25&times;50)</b></div>
 
     <section id="conclusion">
       <div class="narrow">
-        <h2>6. Conclusion</h2>
+        <h2>4. Conclusion</h2>
         <p>Three latent variables reproduce the Hall-thruster breathing mode's limit cycle almost exactly under free-running (autonomous) reservoir dynamics, with the only meaningful residual error being a small, ordinary period mismatch that compounds over many cycles. Two latent variables reconstruct individual frames almost as well, but cannot support autonomous dynamics at all: the latent space itself is not a valid embedding of the attractor, and the reservoir's only stable option is to give up on oscillating. The practical takeaway for this kind of latent-dynamics pipeline: <b>validate the latent embedding's topology, not just its reconstruction error</b>, before asking a downstream dynamical model to learn on top of it &mdash; a bottleneck can look fine by MSE and still be the wrong shape to build dynamics on.</p>
+      </div>
+    </section>
+
+    <section id="appendix-2d">
+      <div class="narrow">
+        <span class="tag tag-rust">&#9679; two latent variables</span>
+        <h2>Appendix A. The two-latent case</h2>
+        <p>The full pipeline was also run with a 2-number latent space (autoencoder: 77,385 parameters; same N&#8201;=&#8201;200 reservoir). It is recorded here for completeness and is not pursued further, because dynamical-systems theory already rules it out.</p>
+        <p><b>Why two dimensions is ill-posed.</b> By the Poincar&eacute;&ndash;Bendixson theorem, a continuous autonomous flow in the plane cannot be chaotic: a bounded trajectory converges to a fixed point or a periodic orbit. Uniqueness of solutions additionally forbids a trajectory from crossing itself. A 2-D latent can therefore represent at most a fixed point or a clean limit cycle, and any 2-D autonomous model fit to this data is forced into one of those outcomes.</p>
+        <p><b>What was observed</b> is consistent with that:</p>
+        <ul>
+          <li>Static reconstruction is barely affected. Fine-tuned validation MSE is __FINAL_VAL2__ against __FINAL_VAL3__ for three latents, and per-field error differs by under one percentage point (n_e __AE2_NE__% vs. __AE3_NE__%, T_e __AE2_TE__% vs. __AE3_TE__%, n&#7749;_i __AE2_NIDOT__% vs. __AE3_NIDOT__%).</li>
+          <li>The latent trajectory self-intersects (Fig. A1), which no orbit of a 2-D autonomous system can do.</li>
+          <li>Driven <i>infer</i> still works reasonably: PC&#8201;=&#8201;__PC_Z2_2__ for the unobserved channel, against 0.978 for three latents.</li>
+          <li>Free-running <i>echo</i> collapses to a fixed point. The latent standard deviation over the second half of the free run is __ECHO_STD2__, against __TRUE_STD2__ for the true signal (three latents: __ECHO_STD3__ vs. __TRUE_STD3__).</li>
+          <li>The discharge current is only partly recoverable from the 2-D latent: held-out R&sup2; of __ID_R2_2__ from a windowed MLP, against __ID_R2_3__ for three latents.</li>
+        </ul>
+        <div class="callout rust">
+          <p class="label">Reading the echo error</p>
+          <p>Decoded echo error is <i>lower</i> for two latents than for three on several fields (n_e __ECHO2_NE__% vs. __ECHO3_NE__%, T_e __ECHO2_TE__% vs. __ECHO3_TE__%, n&#7749;_i __ECHO2_NIDOT__% vs. __ECHO3_NIDOT__%). This reflects the metric, not better dynamics: a constant near the time average has a lower mean relative error than an oscillation that has drifted out of phase. The fixed-point collapse above is the relevant result.</p>
+        </div>
+      </div>
+
+      <figure class="narrow">
+        <img src="data:image/png;base64,__IMG_LAT2_TRAJ__" alt="2D latent trajectory that self-intersects into a hook shape">
+        <figcaption><b>Fig. A1</b> &mdash; The 2-latent trajectory, all 20,000 frames. Unlike Fig. 1 it self-intersects (visible crossing near z&#8321;&asymp;&minus;1.9, z&#8322;&asymp;&minus;0.4): the same (z&#8321;, z&#8322;) point corresponds to more than one physical state.</figcaption>
+      </figure>
+
+      <div class="fig-row narrow" style="max-width:700px">
+        <figure>
+          <img src="data:image/png;base64,__IMG_LAT2_ATTR__" alt="2-latent echo collapsing to a fixed point instead of a limit cycle">
+          <figcaption><b>Fig. A2</b> &mdash; Same three-panel comparison as Fig. 3. The autonomous <i>echo</i> (center) sustains no oscillation and settles at a fixed point.</figcaption>
+        </figure>
+        <figure>
+          <img src="data:image/png;base64,__IMG_LAT2_DECERR__" alt="Decode error flat from step zero">
+          <figcaption><b>Fig. A3</b> &mdash; Decoded-field error vs. time. Echo error is flat from step zero because there is no oscillation to drift out of phase.</figcaption>
+        </figure>
+      </div>
+
+      <div class="narrow tblwrap">
+        <table>
+          <thead><tr><th>Metric</th><th>3 latent</th><th>2 latent</th></tr></thead>
+          <tbody>
+            <tr><td>AE parameters</td><td>__N_PARAMS3__</td><td>__N_PARAMS2__</td></tr>
+            <tr><td>Fine-tuned val. MSE</td><td>__FINAL_VAL3__</td><td>__FINAL_VAL2__</td></tr>
+            <tr><td>Latent phase portrait</td><td>clean, non-self-intersecting</td><td class="hl2">self-intersecting</td></tr>
+            <tr><td>RC listen/train fit error</td><td>__FIT_ERR3__</td><td>__FIT_ERR2__</td></tr>
+            <tr><td>RC echo (autonomous) behavior</td><td>sustains cycle, period off __PERIOD_MISMATCH3__%</td><td class="hl2">collapses to fixed point</td></tr>
+            <tr><td>RC infer PC (unobserved ch.)</td><td>0.978 / 0.946</td><td>__PC_Z2_2__</td></tr>
+            <tr><td>Id recovered from latent (R&sup2;, windowed MLP)</td><td>__ID_R2_3__</td><td class="hl2">__ID_R2_2__</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
   </main>

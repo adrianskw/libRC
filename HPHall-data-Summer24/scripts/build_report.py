@@ -62,11 +62,20 @@ def analyze_rc(latent_dim, n_res):
 
     dec_err = json.load(open(f"{d}/rc_decode_err_summary.json"))
 
+    half = slice(y_val.shape[1] // 2, None)
     return dict(
         D=D, period_true=p_true, period_echo=p_echo, n_cycles=n_true,
         pc=pc, echo_rmse=echo_rmse, infer_rmse=infer_rmse,
         dec_err=dec_err,
+        echo_tail_std=float(y_echo[:, half].std(axis=1).mean()),
+        true_tail_std=float(y_val[:, half].std(axis=1).mean()),
     )
+
+
+def id_recovery_r2(latent_dim):
+    """Held-out R^2 of predicting discharge current from the latent (latent_to_discharge_current.py)."""
+    res = json.load(open(f"{BASE}/latent{latent_dim}/id_map/metrics.json"))["results"]
+    return res["MLP window"]["r2"]
 
 
 def analyze_degree_sweep_map(latent_dim, n_res):
@@ -210,6 +219,16 @@ html = html.replace("__PERIOD_MISMATCH3__", f"{100*abs(r3['period_echo']-r3['per
 html = html.replace("__PC_Z2_3__", f"{r3['pc'][1,1]:.3f}")
 html = html.replace("__PC_Z3_3__", f"{r3['pc'][2,2]:.3f}")
 html = html.replace("__PC_Z2_2__", f"{r2['pc'][1,1]:.3f}")
+def _ae(d, name):
+    return f"{d['ae_err'][name]:.1f}"
+
+
+for _n, _key in (("n_e", "NE"), ("T_e", "TE"), ("n_i_dot", "NIDOT")):
+    html = html.replace(f"__AE2_{_key}__", _ae(r2, _n)).replace(f"__AE3_{_key}__", _ae(r3, _n))
+    html = html.replace(f"__ECHO2_{_key}__", f"{dec_row(r2, _n)[2]:.1f}").replace(f"__ECHO3_{_key}__", f"{dec_row(r3, _n)[2]:.1f}")
+html = html.replace("__ECHO_STD2__", f"{r2['echo_tail_std']:.3f}").replace("__TRUE_STD2__", f"{r2['true_tail_std']:.2f}")
+html = html.replace("__ECHO_STD3__", f"{r3['echo_tail_std']:.2f}").replace("__TRUE_STD3__", f"{r3['true_tail_std']:.2f}")
+html = html.replace("__ID_R2_2__", f"{id_recovery_r2(2):.2f}").replace("__ID_R2_3__", f"{id_recovery_r2(3):.2f}")
 html = html.replace("__FIT_ERR3__", "0.0005")
 html = html.replace("__FIT_ERR2__", "0.0010")
 
