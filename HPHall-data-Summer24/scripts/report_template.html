@@ -1,0 +1,418 @@
+<title>Embedding the Breathing Mode</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#F7F5EF; --surface:#FFFFFF; --surface-2:#EFEBE0;
+  --border:#E1DBCA; --border-strong:#CBC3AA;
+  --text-primary:#211D14; --text-secondary:#5B5645; --text-muted:#8C8570;
+  --teal:#0F766E; --teal-soft:#0F766E1a;
+  --rust:#B5502D; --rust-soft:#B5502D1a;
+  --font-display:'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-body:'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#151309; --surface:#1D1B12; --surface-2:#242116;
+    --border:#37331F; --border-strong:#4C4629;
+    --text-primary:#F3EFE2; --text-secondary:#BDB59D; --text-muted:#867F68;
+    --teal:#3FCBBE; --teal-soft:#3FCBBE22;
+    --rust:#E88354; --rust-soft:#E8835422;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#151309; --surface:#1D1B12; --surface-2:#242116;
+  --border:#37331F; --border-strong:#4C4629;
+  --text-primary:#F3EFE2; --text-secondary:#BDB59D; --text-muted:#867F68;
+  --teal:#3FCBBE; --teal-soft:#3FCBBE22;
+  --rust:#E88354; --rust-soft:#E8835422;
+}
+*{box-sizing:border-box;}
+body{background:var(--bg);color:var(--text-primary);font-family:var(--font-body);margin:0;}
+.page{max-width:980px;margin:0 auto;padding:3rem 1.5rem 4rem;}
+.narrow{max-width:700px;margin:0 auto;}
+h1,h2,h3{font-family:var(--font-display);font-weight:600;text-wrap:balance;color:var(--text-primary);}
+h1{font-size:clamp(28px,5vw,44px);letter-spacing:-0.01em;margin:0 0 .5rem;line-height:1.1;}
+h2{font-size:clamp(21px,3vw,26px);margin:0 0 .9rem;padding-top:.2rem;}
+h3{font-size:17px;margin:1.6rem 0 .6rem;}
+p{line-height:1.7;font-size:15.5px;color:var(--text-secondary);}
+p b, li b{color:var(--text-primary);font-weight:600;}
+a{color:var(--teal);}
+.eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--text-muted);margin:0 0 .8rem;}
+.dek{font-size:18px;line-height:1.6;color:var(--text-secondary);margin:0 0 1.4rem;max-width:640px;}
+.byline{font-family:var(--font-mono);font-size:12px;color:var(--text-muted);display:flex;gap:1.2rem;flex-wrap:wrap;padding-bottom:1.8rem;border-bottom:1px solid var(--border);margin-bottom:2rem;}
+.byline span{white-space:nowrap;}
+
+.abstract{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--teal);border-radius:0 var(--radius) var(--radius) 0;padding:1.3rem 1.5rem;margin-bottom:2.2rem;}
+.abstract p{margin:0;color:var(--text-primary);font-size:15px;}
+.abstract .label{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--teal);margin:0 0 .5rem;}
+
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:2.4rem;}
+.stat{background:var(--surface);padding:.9rem 1.1rem;}
+.stat-label{font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin:0 0 .35rem;}
+.stat-value{font-family:var(--font-mono);font-weight:600;font-size:19px;color:var(--text-primary);font-variant-numeric:tabular-nums;}
+.stat-value small{font-weight:400;font-size:11px;color:var(--text-secondary);}
+
+nav.toc{font-family:var(--font-mono);font-size:12.5px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.3rem;margin-bottom:2.6rem;}
+nav.toc .label{color:var(--text-muted);letter-spacing:.06em;text-transform:uppercase;font-size:10px;margin-bottom:.6rem;display:block;}
+nav.toc ol{margin:0;padding-left:1.1rem;color:var(--text-secondary);}
+nav.toc li{margin-bottom:.25rem;}
+nav.toc a{color:var(--text-primary);text-decoration:none;}
+nav.toc a:hover{color:var(--teal);}
+
+section{margin-bottom:3rem;scroll-margin-top:1.5rem;}
+.tag{display:inline-flex;align-items:center;gap:.4rem;font-family:var(--font-mono);font-size:11px;letter-spacing:.04em;padding:.2rem .6rem;border-radius:999px;margin:0 0 .8rem;}
+.tag.tag-teal{background:var(--teal-soft);color:var(--teal);}
+.tag.tag-rust{background:var(--rust-soft);color:var(--rust);}
+
+figure{margin:1.6rem 0;}
+figure img{width:100%;display:block;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);}
+figcaption{font-size:13px;color:var(--text-muted);margin-top:.6rem;line-height:1.55;max-width:700px;}
+.fig-row{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;}
+@media (max-width:640px){.fig-row{grid-template-columns:1fr;}}
+
+.tblwrap{overflow-x:auto;margin:1.2rem 0;}
+table{border-collapse:collapse;width:100%;font-size:13.5px;}
+th,td{padding:.55rem .8rem;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;font-variant-numeric:tabular-nums;}
+th:first-child,td:first-child{text-align:left;font-variant-numeric:normal;white-space:normal;}
+th{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border-strong);}
+td.hl{color:var(--rust);font-weight:600;}
+td.hl2{color:var(--rust);font-weight:600;}
+tbody tr:hover{background:var(--surface-2);}
+
+.pipeline{font-family:var(--font-mono);font-size:13px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.2rem;overflow-x:auto;white-space:pre;color:var(--text-secondary);margin:1.2rem 0;}
+.pipeline b{color:var(--text-primary);}
+
+.callout{border:1px solid var(--border);background:var(--surface);border-radius:var(--radius);padding:1.1rem 1.3rem;margin:1.4rem 0;}
+.callout.rust{border-left:3px solid var(--rust);}
+.callout.teal{border-left:3px solid var(--teal);}
+.callout .label{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;margin:0 0 .5rem;}
+.callout.rust .label{color:var(--rust);}
+.callout.teal .label{color:var(--teal);}
+.callout p{margin:0;font-size:14.5px;color:var(--text-primary);}
+
+footer{border-top:1px solid var(--border);padding-top:1.4rem;margin-top:3rem;font-family:var(--font-mono);font-size:11.5px;color:var(--text-muted);line-height:1.8;}
+footer a{color:var(--text-muted);}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;}}
+</style>
+
+<div class="page">
+  <header class="narrow">
+    <p class="eyebrow">Technical report &middot; Hall-thruster latent dynamics</p>
+    <h1>Embedding the Breathing Mode</h1>
+    <p class="dek">A convolutional autoencoder compresses a Hall-thruster plasma simulation into a handful of numbers; a small reservoir computer learns to run their dynamics on its own. Three latent numbers are enough to reproduce the discharge's breathing-mode limit cycle. Two are not &mdash; and the reason is topological, not statistical.</p>
+    <div class="byline">
+      <span>adrianskw / AE&#8209;RC</span>
+      <span>HPHall-data-Summer24</span>
+      <span>SPT-100-class thruster, 300&nbsp;V / 5.01&nbsp;mg&middot;s<sup>-1</sup> Xe</span>
+    </div>
+  </header>
+
+  <div class="narrow">
+    <div class="abstract">
+      <p class="label">Summary</p>
+      <p>A 7-field, 50&times;25 plasma fluid simulation (20,000 frames, 1&nbsp;ms of a breathing-mode oscillation) is compressed by a convolutional autoencoder into a 3-number latent trajectory. A 200-node reservoir computer, driven only by that 3-number series, learns to reproduce the oscillation on its own: run with no external input at all, it free-runs the correct limit-cycle shape at the correct frequency to within 3.4%. Repeating the entire pipeline with a 2-number latent space instead gives an autoencoder that is <i>almost as accurate</i> at static reconstruction &mdash; but whose latent trajectory self-intersects, and whose reservoir cannot sustain an autonomous oscillation at all: it collapses to a fixed point. Three latent variables are not an arbitrary round number here; they appear to be the minimum needed to embed this attractor without ambiguity.</p>
+    </div>
+  </div>
+
+  <nav class="toc narrow">
+    <span class="label">Contents</span>
+    <ol>
+      <li><a href="#background">Background &amp; pipeline</a></li>
+      <li><a href="#three-latent">Results: three latent variables</a></li>
+      <li><a href="#two-latent">Results: two latent variables</a></li>
+      <li><a href="#comparison">Side-by-side comparison</a></li>
+      <li><a href="#discussion">Why three? An embedding-dimension argument</a></li>
+      <li><a href="#conclusion">Conclusion</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section id="background">
+      <div class="narrow">
+        <h2>1. Background &amp; pipeline</h2>
+        <p>The underlying data is an HPHall-II simulation of an SPT-100-class Hall-effect thruster (300&nbsp;V discharge, 5.01&nbsp;mg/s xenon, 0.02&nbsp;T radial field), saved every 50&nbsp;ns for 20,000 iterations (1.00&nbsp;ms simulated). Each frame holds 7 fields &mdash; electron density <i>n<sub>e</sub></i>, potential <i>&phi;</i>, electron temperature <i>T<sub>e</sub></i>, neutral density <i>n<sub>n</sub></i>, ionization rate <i>&#7749;<sub>i</sub></i>, and axial/radial ion velocity <i>v<sub>i,z</sub></i>, <i>v<sub>i,r</sub></i> &mdash; on a 50&times;25 grid, and the whole run is dominated by the classic <b>breathing-mode</b> instability: a global, quasi-periodic oscillation of the discharge.</p>
+        <p>The pipeline has three stages, and the autoencoder and reservoir are trained and evaluated completely separately:</p>
+        <div class="pipeline">field grid <b>(7&times;25&times;50)</b>
+   &#8595;  <b>[ frozen conv-autoencoder encoder ]</b>
+latent vector <b>z &isin; R^D</b>   (D = 3, or D = 2 for comparison)
+   &#8595;  <b>[ reservoir computer, N = 200 nodes ]</b>
+predicted latent <b>&#7825;</b>   (driven, or fully autonomous)
+   &#8595;  <b>[ same frozen autoencoder, decoder half ]</b>
+predicted field grid <b>(7&times;25&times;50)</b></div>
+        <p>The autoencoder is a small 3-layer convolutional encoder/decoder (89,034 trainable parameters for D&#8201;=&#8201;3; 77,385 for D&#8201;=&#8201;2 &mdash; the difference is entirely in the two linear layers either side of the bottleneck). It was trained in two passes: 200 epochs on a 2,000-frame subsample, then warm-started and fine-tuned for 60 more epochs on the complete 20,000-frame run. All splits are <b>chronological</b> (85% / 15%, i.e. the last 3,000 frames are held out) rather than random, so "generalizes" means "extrapolates to unseen future cycles," not just interpolates.</p>
+        <p>The reservoir is a <a href="https://github.com/adrianskw/libRC"><code>mapRC</code></a> from libRC: 200 nodes, spectral radius 0.9, connection degree 10 (&asymp;5% density), driven by the AE's latent series and fit with ridge regression (&alpha;&#8201;=&#8201;10<sup>-3</sup>). Only the linear readout is trained &mdash; the reservoir's internal connectivity is fixed random weights, so the entire learned system is a D&times;201 matrix (603 numbers for D&#8201;=&#8201;3). Three regimes are tested on the held-out window: <b>listen/train</b> (fit quality while driven by the true signal), <b>echo</b> (disconnect entirely and run autonomously &mdash; the real test of whether the attractor's dynamics were learned), and <b>infer</b> (drive with only <i>z</i><sub>1</sub> and estimate the rest, a partial-observability test).</p>
+      </div>
+    </section>
+
+    <section id="three-latent">
+      <div class="narrow">
+        <span class="tag tag-teal">&#9679; three latent variables</span>
+        <h2>2. Results: three latent variables</h2>
+        <p>The fine-tuned autoencoder reaches a validation MSE of <b>__FINAL_VAL3__</b> (normalized units; train __FINAL_TRAIN3__), down from a warm-start baseline of __PREWARM3__ before any full-dataset fine-tuning &mdash; confirming the 2,000-frame subsample was already a representative training set. Static per-field reconstruction error (autoencoder only, no reservoir involved) ranges from 1.3% (potential) to 18.4% (ionization rate, the most spatially localized field).</p>
+      </div>
+
+      <figure class="narrow">
+        <img src="data:image/png;base64,__IMG_LAT3_TRAJ__" alt="3D latent trajectory, 20,000 frames, forming a clean closed torus">
+        <figcaption><b>Fig. 1</b> &mdash; The full 20,000-frame latent trajectory in (z&#8321;, z&#8322;, z&#8323;)-space. It closes into a clean, non-self-intersecting loop: the breathing-mode limit cycle, recovered by the autoencoder without ever being told a cycle exists.</figcaption>
+      </figure>
+
+      <div class="narrow">
+        <p>Driving the reservoir with this trajectory and fitting the readout gives a listen/train fit error of <b>__FIT_ERR3__</b> &mdash; the reservoir tracks the driven signal almost exactly. The two real tests are what happens once the true signal is taken away or partially withheld:</p>
+      </div>
+
+      <figure class="narrow">
+        <img src="data:image/png;base64,__IMG_LAT3_TS__" alt="Time series of z1, z2, z3: true vs echo vs infer over the held-out window">
+        <figcaption><b>Fig. 2</b> &mdash; Held-out latent trajectory (blue) vs. the reservoir's autonomous <i>echo</i> (orange) and z&#8321;-driven <i>infer</i> (green). Infer tracks the true signal for the full 3,000-step window; echo oscillates at nearly the right amplitude but visibly drifts out of phase after a few cycles.</figcaption>
+      </figure>
+
+      <div class="fig-row narrow" style="max-width:700px">
+        <figure>
+          <img src="data:image/png;base64,__IMG_LAT3_ATTR__" alt="Attractor comparison: true, echo, infer">
+          <figcaption><b>Fig. 3</b> &mdash; Same three trajectories projected as attractors. Echo (autonomous) reproduces the correct tilted-torus <i>shape</i> even though it has drifted out of phase in time.</figcaption>
+        </figure>
+        <figure>
+          <img src="data:image/png;base64,__IMG_LAT3_DECERR__" alt="Decoded-field error growing over the free-run window for echo, flat for infer">
+          <figcaption><b>Fig. 4</b> &mdash; Mean relative error across all 7 decoded fields, vs. steps into the held-out window. Infer (driven) stays flat; echo (autonomous) climbs steadily as phase drift compounds.</figcaption>
+        </figure>
+      </div>
+
+      <div class="narrow">
+        <div class="callout teal">
+          <p class="label">Key finding</p>
+          <p>The autonomous reservoir's period is <b>__PERIOD_ECHO3__ steps</b> against a true period of <b>__PERIOD_TRUE3__ steps</b> &mdash; a mismatch of only <b>__PERIOD_MISMATCH3__%</b>. Over a free-run window spanning ~19 cycles, that small a per-cycle error compounds into more than half a cycle of phase drift by the end &mdash; which is why point-wise RMSE looks poor even though the learned dynamics are essentially correct. For a driven partial-observation test (z&#8321; observed, z&#8322;/z&#8323; estimated), the reservoir reconstructs the unobserved channels with Pearson-correlation scores of <b>__PC_Z2_3__</b> (z&#8322;) and <b>__PC_Z3_3__</b> (z&#8323;).</p>
+        </div>
+      </div>
+
+      <div class="narrow">
+        <h3>Decoded back to physical fields</h3>
+        <p>Feeding the reservoir's predicted latents back through the frozen decoder closes the loop, so the comparison can be made in physical units rather than abstract latent coordinates.</p>
+      </div>
+
+      <figure class="narrow">
+        <img src="data:image/png;base64,__IMG_LAT3_PANEL__" alt="Field-by-field decode comparison: original, AE-only, RC-infer, RC-echo">
+        <figcaption><b>Fig. 5</b> &mdash; Val step 500 (&asymp;3 cycles in), all 7 fields. Rows: original simulation, AE round-trip on the true latent (reconstruction floor), reservoir-infer decode, reservoir-echo decode. <i>n<sub>e</sub></i>, <i>n<sub>n</sub></i>, and <i>&#7749;<sub>i</sub></i> (the three number densities) are shown on a log<sub>10</sub> color scale, matching the space the autoencoder itself trains on for these fields; the other four fields are linear. All four rows are still close at this point in the free run.</figcaption>
+      </figure>
+
+      <div class="narrow tblwrap">
+        <table>
+          <thead><tr><th>Field</th><th>AE floor</th><th>RC&#8209;infer</th><th>RC&#8209;echo</th></tr></thead>
+          <tbody>__ROWS3__</tbody>
+        </table>
+      </div>
+      <div class="narrow">
+        <p style="font-size:13px;color:var(--text-muted);margin-top:-.6rem;">Mean relative error, full 3,000-step held-out window. <b>AE floor</b> = decoding the AE's own true latent (no reservoir involved) &mdash; the reconstruction error the autoencoder alone contributes. Note how little <i>n<sub>n</sub></i> (neutral density, the slowest-varying field) is affected by echo&#8217;s phase drift, versus the strongly oscillating fields (<i>T<sub>e</sub></i>, <i>&#7749;<sub>i</sub></i>) which are hit hardest &mdash; a physically consistent signature of a phase-drift failure mode rather than a decoding artifact.</p>
+      </div>
+
+      <div class="narrow">
+        <h3>Does more reservoir capacity help? N=200 vs. N=1,000</h3>
+        <p>The 200-node reservoir above is deliberately small. Repeating the identical fit with a <b>1,000-node</b> reservoir (same &rho;, degree, and ridge &alpha;) keeps the same 3-dimensional embedding but gives the readout far more room to represent the map from reservoir state to next latent step.</p>
+      </div>
+
+      <figure class="narrow">
+        <img src="data:image/png;base64,__IMG_LAT3_TS_N1000__" alt="Time series of z1, z2, z3 with a 1000-node reservoir: true vs echo vs infer over the held-out window">
+        <figcaption><b>Fig. 5b</b> &mdash; Same held-out window as Fig. 2, now with N=1,000. Infer (green) still tracks the true signal throughout; echo (orange) sustains the oscillation with far less visible phase drift than the N=200 case.</figcaption>
+      </figure>
+
+      <div class="narrow">
+        <div class="callout teal">
+          <p class="label">Capacity helps the well-posed case</p>
+          <p>At N=1,000 the autonomous period mismatch drops to <b>__PERIOD_MISMATCH3_N1000__%</b> (from __PERIOD_MISMATCH3__% at N=200), mean echo RMSE in latent space falls from __ECHO_RMSE3_N200__ to <b>__ECHO_RMSE3_N1000__</b>, and the driven infer PC improves slightly to __PC_Z2_3_N1000__ / __PC_Z3_3_N1000__ (from 0.978 / 0.946). Decoded through the same frozen AE, echo error stops climbing monotonically and instead oscillates within a bounded range as the reservoir settles onto a stable, correctly-shaped limit cycle.</p>
+        </div>
+      </div>
+
+      <div class="narrow tblwrap">
+        <table>
+          <thead><tr><th>Field (RC&#8209;echo error)</th><th>N=200</th><th>N=1,000</th></tr></thead>
+          <tbody>__ROWS_N1000__</tbody>
+        </table>
+      </div>
+
+      <div class="narrow">
+        <p style="font-size:13px;color:var(--text-muted);">For reference: repeating this same N=200&rarr;1,000 jump on the 2-latent embedding does <i>not</i> reproduce this improvement. Its autonomous mode stops collapsing to a fixed point, but rather than finding the true limit cycle it settles onto a smaller, offset, spurious one that avoids the self-intersection &mdash; echo RMSE actually gets slightly <i>worse</i> (0.98&rarr;1.17). More capacity fixes an under-fit reservoir; it cannot fix a latent space that is not a valid embedding of the attractor in the first place &mdash; consistent with &sect;5 below.</p>
+      </div>
+
+      <div class="narrow">
+        <h3>How much does the reservoir's own architecture matter?</h3>
+        <p>Every result above uses one fixed connectivity (degree 10, i.e. each node wired to 10 others) and one fixed update rule (mapRC's discrete map). Two further sweeps, still entirely in latent space (no decoding), probe how much those choices matter: (1) the connectivity degree of the mapRC reservoir, swept 0&ndash;10 at N=200; and (2) for a <b>diffRC</b> reservoir &mdash; the same node but updated by integrating an ODE (<code>r&#775; = &minus;r + tanh(Ar+By)</code>, via RK2) rather than iterating a discrete map &mdash; both degree (0&ndash;10) <i>and</i> the integration step <code>ds</code> (0.001&ndash;1), a 77-point grid.</p>
+      </div>
+
+      <figure class="narrow">
+        <img src="data:image/png;base64,__IMG_DEGREE_SWEEP_MAP__" alt="mapRC degree sweep: echo/infer RMSE, infer PC, and period mismatch vs. degree">
+        <figcaption><b>Fig. 6</b> &mdash; mapRC, N=200, degree 0&ndash;10. Left: echo &amp; infer RMSE. Middle: driven-infer reconstruction quality (PC) for the unobserved channels. Right: autonomous period error.</figcaption>
+      </figure>
+
+      <div class="narrow">
+        <div class="callout teal">
+          <p class="label">Sparser wiring is better for mapRC's free run</p>
+          <p>Autonomous echo is sharply <i>better</i> with almost no internal connectivity: mean echo RMSE is <b>__MAP_ECHO_RMSE_LOW__</b> at degree 0&ndash;1, versus <b>__MAP_ECHO_RMSE_HIGH__</b> across degree 2&ndash;10 &mdash; roughly 2&ndash;3&times; worse, with no further trend as degree keeps climbing. Driven <code>infer</code>, by contrast, barely moves: PC for the unobserved channels stays in the 0.92&ndash;0.98 band at every degree, peaking at degree __MAP_BEST_PC_DEGREE__ (__MAP_BEST_PC_Z2__ / __MAP_BEST_PC_Z3__). Extra random recurrent connections add dynamical complexity the ridge readout never has to correct for while being driven, but that same complexity destabilizes the free-running attractor.</p>
+        </div>
+      </div>
+
+      <figure class="narrow">
+        <img src="data:image/png;base64,__IMG_DS_DEGREE_HEATMAP__" alt="diffRC ds x degree heatmap: infer PC and log echo RMSE">
+        <figcaption><b>Fig. 7</b> &mdash; diffRC, N=200, 7 values of ds &times; degree 0&ndash;10 (__DIFF_N_TOTAL__ fits). Left: mean driven-infer PC (unobserved channels) &mdash; bright is good. Right: log<sub>10</sub>(echo RMSE) &mdash; bright is good (low RMSE), dark is bad.</figcaption>
+      </figure>
+
+      <div class="narrow">
+        <div class="callout rust">
+          <p class="label">diffRC is far less forgiving than mapRC</p>
+          <p>Where every mapRC degree gave a usable reservoir, __DIFF_N_FAIL__ of __DIFF_N_TOTAL__ diffRC (ds, degree) combinations produced a driven <code>infer</code> that is essentially uncorrelated with the truth (PC &lt; 0.1) despite a perfectly reasonable-looking echo RMSE &mdash; the readout fits the training data but the ODE-integrated state trajectory it relies on doesn't reproduce under re-driving. This isn't confined to one regime: <code>degree=0</code> fails this way at every ds&nbsp;&ge;&nbsp;0.1, and mid-size ds (0.003&ndash;0.03) fail this way at nearly <i>every</i> degree &ge; 1 &mdash; a resonance between the fixed ridge gain and the RK2 step size that mapRC, having no step size to begin with, simply cannot exhibit.</p>
+        </div>
+      </div>
+
+      <div class="narrow">
+        <div class="callout teal">
+          <p class="label">...but the best diffRC point edges out mapRC's best</p>
+          <p>The single best combination found, <b>ds=__DIFF_BEST_DS__, degree=__DIFF_BEST_DEGREE__</b>, reaches mean echo RMSE __DIFF_BEST_ECHO_RMSE__ with infer PC __DIFF_BEST_PC_Z2__ / __DIFF_BEST_PC_Z3__ &mdash; simultaneously lower echo error <i>and</i> comparable-or-better driven reconstruction than mapRC's own best degree-0 echo (__MAP_ECHO_RMSE_LOW__) or best-PC configuration (__MAP_BEST_PC_Z2__ / __MAP_BEST_PC_Z3__ at degree __MAP_BEST_PC_DEGREE__). The catch is that this point sits in a narrow, non-obvious pocket of the grid rather than on any clear trend line: neighboring ds values a factor of 3&ndash;10&times; away land back in the failure regime above. mapRC's degree sweep is a smooth, forgiving trade-off; diffRC trades that robustness for a slightly better ceiling <i>if</i> ds is tuned specifically for this system.</p>
+        </div>
+      </div>
+
+      <div class="narrow">
+        <h3>Does the autoencoder's capacity matter to the RC?</h3>
+        <p>Every result above uses the "production" AE (16/32/64 channels, warm-started on a 2,000-frame subsample before fine-tuning on the full set). The RC itself is a deliberately small, lightweight model &mdash; does the AE feeding it need to be as large as it is? Three architecturally-scaled variants, each trained from scratch for 60 epochs on the full 20,000-frame set with no warm start, isolate parameter count as the only difference: <b>light</b> (8/16/32 channels, __AE_LIGHT_PARAMS__ params), <b>base</b> (16/32/64, __AE_BASE_PARAMS__ params &mdash; same architecture as production), and <b>heavy</b> (32/64/128, __AE_HEAVY_PARAMS__ params).</p>
+      </div>
+
+      <figure class="narrow">
+        <img src="data:image/png;base64,__IMG_AE_CAPACITY__" alt="AE capacity sweep: reconstruction loss and per-field error vs. parameter count">
+        <figcaption><b>Fig. 8</b> &mdash; light/base/heavy conv-AE, trained from scratch. Left: final validation loss vs. parameter count. Right: per-field mean relative reconstruction error.</figcaption>
+      </figure>
+
+      <div class="narrow">
+        <div class="callout teal">
+          <p class="label">Capacity buys diminishing reconstruction returns</p>
+          <p>Mean per-field reconstruction error drops from __AE_LIGHT_ERR__% (light) to __AE_BASE_ERR__% (base) to __AE_HEAVY_ERR__% (heavy) &mdash; most of the gain comes from the first step up, not the second. The ionization-rate field <code>&#7749;<sub>i</sub></code> is by far the most size-sensitive: __AE_LIGHT_NIDOT__% &rarr; __AE_BASE_NIDOT__% &rarr; __AE_HEAVY_NIDOT__%, roughly double every other field's error at every size. Going lighter costs real fidelity; going heavier than "base" buys comparatively little.</p>
+        </div>
+      </div>
+
+      <div class="fig-row narrow">
+        <figure>
+          <img src="data:image/png;base64,__IMG_AE_LATENT_TS__" alt="Aligned latent time series: light vs base vs heavy AE">
+        </figure>
+        <figure>
+          <img src="data:image/png;base64,__IMG_AE_LATENT_ATTR__" alt="Aligned latent attractor overlay: light vs base vs heavy AE">
+        </figure>
+      </div>
+      <p class="narrow" style="font-size:13px;color:var(--text-muted);margin-top:-1rem;">
+        <b>Fig. 9</b> &mdash; Latent trajectories of all three independently-trained AEs, held-out window, each channel z-scored and Hungarian-matched (by |correlation|, with sign flip) to the base variant's basis. Left: time series. Right: 3-D attractor.
+      </p>
+
+      <div class="narrow">
+        <div class="callout teal">
+          <p class="label">Independently-trained AEs converge on the same attractor</p>
+          <p>Despite different architectures, parameter counts, and random initializations, each variant's latent basis aligns tightly onto base's: matched channel correlations for light range __LATENT_LIGHT_CORR_MIN__&ndash;__LATENT_LIGHT_CORR_MAX__ (mean |r|=__LATENT_LIGHT_CORR_MEAN__), and for heavy __LATENT_HEAVY_CORR_MIN__&ndash;__LATENT_HEAVY_CORR_MAX__ (mean |r|=__LATENT_HEAVY_CORR_MEAN__). The breathing-mode limit cycle recovered in &sect;2 is not an artifact of one particular encoder architecture or training run &mdash; it's a property of the underlying dynamics that any sufficiently capable encoder converges onto, up to rotation/reflection/permutation of its latent axes.</p>
+        </div>
+      </div>
+
+      <div class="narrow">
+        <p>The latent bases converge, but does the small residual difference in AE fidelity change what a reservoir trained on top of it can do? The same best-mapRC (degree=1) and best-diffRC (ds=0.3, degree=2) configs, refit from scratch on each AE's own latent (native channel 0 driven, no cross-AE alignment), answer this directly.</p>
+      </div>
+
+      <figure class="narrow">
+        <img src="data:image/png;base64,__IMG_AE_RC_BY_SIZE__" alt="Echo RMSE, infer PC, and period mismatch grouped by AE size, for mapRC and diffRC">
+        <figcaption><b>Fig. 10</b> &mdash; Echo RMSE, mean driven-infer PC (unobserved channels), and autonomous period mismatch, by AE size, for the best mapRC and best diffRC configs fit independently on each AE's latent.</figcaption>
+      </figure>
+
+      <div class="narrow tblwrap">
+        <table>
+          <thead><tr><th>AE (params)</th><th>mapRC echo RMSE</th><th>mapRC infer PC</th><th>diffRC echo RMSE</th><th>diffRC infer PC</th></tr></thead>
+          <tbody>
+            <tr><td>light (__AE_LIGHT_PARAMS__)</td><td>__RCSIZE_LIGHT_MAP_ECHO__</td><td>__RCSIZE_LIGHT_MAP_PC__</td><td>__RCSIZE_LIGHT_DIFF_ECHO__</td><td>__RCSIZE_LIGHT_DIFF_PC__</td></tr>
+            <tr><td>base (__AE_BASE_PARAMS__)</td><td>__RCSIZE_BASE_MAP_ECHO__</td><td>__RCSIZE_BASE_MAP_PC__</td><td>__RCSIZE_BASE_DIFF_ECHO__</td><td>__RCSIZE_BASE_DIFF_PC__</td></tr>
+            <tr><td>heavy (__AE_HEAVY_PARAMS__)</td><td>__RCSIZE_HEAVY_MAP_ECHO__</td><td>__RCSIZE_HEAVY_MAP_PC__</td><td class="hl">__RCSIZE_HEAVY_DIFF_ECHO__</td><td class="hl">__RCSIZE_HEAVY_DIFF_PC__</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="narrow">
+        <div class="callout rust">
+          <p class="label">Better AE, better echo, worse infer &mdash; and diffRC breaks outright</p>
+          <p>Echo RMSE improves monotonically with AE size for both RC types, as expected from a cleaner latent signal. Driven infer PC does the <i>opposite</i>: it degrades as the AE gets bigger, and diffRC on the heavy AE's latent collapses outright (PC&asymp;0.19/0.01, essentially uncorrelated with truth) despite an unremarkable echo RMSE. Part of this is a real effect and part is a fitting artifact worth flagging: these "best" hyperparameters were tuned specifically against the production AE's particular trained instance, not against AE capacity in general &mdash; even <b>base</b>, which matches production's architecture exactly, reaches only __RCSIZE_BASE_MAP_PC__ infer PC here versus __PC_Z2_3__ / __PC_Z3_3__ for the actual production AE earlier in this report. The RC's sensitivity is not just to how big the AE is, but to the specific local minimum the AE training happened to land in.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="two-latent">
+      <div class="narrow">
+        <span class="tag tag-rust">&#9679; two latent variables</span>
+        <h2>3. Results: two latent variables</h2>
+        <p>Repeating the identical pipeline with a 2-number latent space (77,385 AE parameters) gives a fine-tuned validation MSE of <b>__FINAL_VAL2__</b> &mdash; only modestly worse than the 3-latent __FINAL_VAL3__. Static per-field errors move by well under a percentage point across the board. By reconstruction accuracy alone, two numbers look almost sufficient.</p>
+      </div>
+
+      <figure class="narrow">
+        <img src="data:image/png;base64,__IMG_LAT2_TRAJ__" alt="2D latent trajectory that self-intersects into a hook shape">
+        <figcaption><b>Fig. 6</b> &mdash; The 2-latent trajectory, all 20,000 frames. Unlike Fig. 1, this is not a clean loop: it <b>self-intersects</b> (visible crossing near z&#8321;&asymp;&minus;1.9, z&#8322;&asymp;&minus;0.4). The same (z&#8321;, z&#8322;) point corresponds to more than one physical state.</figcaption>
+      </figure>
+
+      <div class="fig-row narrow" style="max-width:700px">
+        <figure>
+          <img src="data:image/png;base64,__IMG_LAT2_ATTR__" alt="2-latent echo collapsing to a fixed-point spiral instead of a limit cycle">
+          <figcaption><b>Fig. 7</b> &mdash; Same three-panel comparison as Fig. 3. The autonomous <i>echo</i> trajectory (center) does not sustain any oscillation: it spirals inward and settles at a fixed point.</figcaption>
+        </figure>
+        <figure>
+          <img src="data:image/png;base64,__IMG_LAT2_DECERR__" alt="Decode error flat and elevated from step zero, not growing">
+          <figcaption><b>Fig. 8</b> &mdash; Decoded-field error vs. time. Echo is elevated (&asymp;26&ndash;34%) from step zero and stays flat &mdash; it never had dynamics to drift out of; it was already stuck.</figcaption>
+        </figure>
+      </div>
+
+      <div class="narrow">
+        <div class="callout rust">
+          <p class="label">Key finding</p>
+          <p>The 2-latent reservoir's listen/train fit error (__FIT_ERR2__) is comparable to the 3-latent case, and its driven <i>infer</i> mode still works reasonably (PC&#8201;=&#8201;__PC_Z2_2__ for the unobserved channel, down from 0.978/0.946). But its <i>echo</i> mode fails qualitatively, not just quantitatively: instead of drifting out of phase like the 3-latent case, it never sustains a cycle at all. Collapsing to the mean latent state acts like predicting the time-averaged field &mdash; a statistically sensible fallback that keeps the raw error from looking catastrophic, but it is not the dynamics of a breathing-mode thruster.</p>
+        </div>
+      </div>
+
+      <div class="narrow tblwrap">
+        <table>
+          <thead><tr><th>Field</th><th>AE floor</th><th>RC&#8209;infer</th><th>RC&#8209;echo</th></tr></thead>
+          <tbody>__ROWS2__</tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="comparison">
+      <div class="narrow">
+        <h2>4. Side-by-side</h2>
+      </div>
+      <div class="narrow tblwrap">
+        <table>
+          <thead><tr><th>Metric</th><th>3 latent (teal)</th><th>2 latent (rust)</th></tr></thead>
+          <tbody>
+            <tr><td>AE parameters</td><td>__N_PARAMS3__</td><td>__N_PARAMS2__</td></tr>
+            <tr><td>Fine-tuned val. MSE</td><td>__FINAL_VAL3__</td><td>__FINAL_VAL2__</td></tr>
+            <tr><td>Latent phase portrait</td><td>clean, non-self-intersecting</td><td class="hl2">self-intersecting</td></tr>
+            <tr><td>RC listen/train fit error</td><td>__FIT_ERR3__</td><td>__FIT_ERR2__</td></tr>
+            <tr><td>RC echo (autonomous) behavior</td><td>sustains cycle, period off __PERIOD_MISMATCH3__%</td><td class="hl2">collapses to fixed point</td></tr>
+            <tr><td>RC echo decode error trend</td><td>climbs 21%&rarr;&gt;50%</td><td class="hl2">flat 26&ndash;34% from t=0</td></tr>
+            <tr><td>RC infer PC (unobserved ch.)</td><td>0.978 / 0.946</td><td>__PC_Z2_2__</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="discussion">
+      <div class="narrow">
+        <h2>5. Why three? An embedding-dimension argument</h2>
+        <p>The static-reconstruction numbers alone would suggest two latent variables are nearly as good as three. The dynamics say otherwise, and the reason is topological rather than statistical.</p>
+        <p>A simple closed loop &mdash; a single-frequency limit cycle &mdash; can always be drawn in a plane without crossing itself; that is just what a circle is. If the breathing mode were that simple, a 2-latent embedding should have produced a clean loop, the same way the 3-latent one did. It didn't: Fig. 6 shows a genuine self-intersection, meaning two different physical states of the plasma were mapped to the same (z&#8321;, z&#8322;) point. That is not a training failure of the autoencoder &mdash; it is a direct, empirical demonstration that <b>the true attractor is not a simple 1-D circle</b>. It has enough additional structure (weak higher-harmonic content, or a genuinely quasi-periodic rather than strictly periodic character) that no 2-dimensional projection can represent it without ambiguity.</p>
+        <p>This is the same obstruction that motivates <b>Takens' delay-embedding theorem</b> in dynamical systems: reconstructing an attractor of intrinsic (box-counting) dimension <i>d</i> from observations generically requires an embedding space of at least 2<i>d</i>&#8201;+&#8201;1 dimensions to guarantee no spurious self-intersections; fewer dimensions fold the attractor over itself. Takens' theorem is stated for delay-coordinate embeddings of a scalar time series, not for a learned autoencoder bottleneck, but the topological argument transfers directly: an embedding is an embedding, however it is constructed, and a 2-dimensional target space cannot faithfully represent an attractor whose effective dimension exceeds 1.</p>
+        <p>The reservoir results make the consequence concrete rather than abstract. A learned autonomous map on an ambiguous, self-crossing state space has no consistent vector field to follow at the crossing point &mdash; two different "next states" are equally valid continuations of the same current state. The 2-latent reservoir's response was to settle onto a fixed point that avoids the contradiction altogether, rather than to sustain a cycle that would eventually have to pass back through the ambiguous region. The 3-latent reservoir, given a genuinely unambiguous embedding, had no such obstruction &mdash; and its only remaining error (a 3.4% period mismatch) is an ordinary least-squares fitting imprecision, not a structural one.</p>
+      </div>
+    </section>
+
+    <section id="conclusion">
+      <div class="narrow">
+        <h2>6. Conclusion</h2>
+        <p>Three latent variables reproduce the Hall-thruster breathing mode's limit cycle almost exactly under free-running (autonomous) reservoir dynamics, with the only meaningful residual error being a small, ordinary period mismatch that compounds over many cycles. Two latent variables reconstruct individual frames almost as well, but cannot support autonomous dynamics at all: the latent space itself is not a valid embedding of the attractor, and the reservoir's only stable option is to give up on oscillating. The practical takeaway for this kind of latent-dynamics pipeline: <b>validate the latent embedding's topology, not just its reconstruction error</b>, before asking a downstream dynamical model to learn on top of it &mdash; a bottleneck can look fine by MSE and still be the wrong shape to build dynamics on.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="narrow">
+    <div>Autoencoder: 3-layer conv encoder/decoder, PyTorch, Adam, chronological 85/15 split, log&#8321;&#8320; transform on n_e/n_n/n&#7749;_i before per-channel z-score.</div>
+    <div>Reservoir: <code>libRC.mapRC</code>, N=200, &rho;=0.9, degree=10, ridge &alpha;=10<sup>-3</sup>, bias node, seed=0.</div>
+    <div>Source data: HPHall-II simulation, dt&#8320;=50&nbsp;ns, 20,000 iterations (1.00&nbsp;ms), SPT-100-class geometry.</div>
+    <div>adrianskw/AE-RC &middot; branch <code>ae-rc</code> of adrianskw/libRC</div>
+  </footer>
+</div>
