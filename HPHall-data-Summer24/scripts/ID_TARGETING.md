@@ -13,11 +13,64 @@ Splits everywhere: chronological, `n_train = 17000`, held-out = frames
 | step | script | result |
 |---|---|---|
 | does the latent hold Id? | `latent_to_discharge_current.py` | yes for 3-D (R² 0.94, windowed MLP); no for 2-D (0.55) |
-| **option 1**: 4-channel RC, Id-driven infer | `rc_with_id.py`, `rc_seed_sweep.py` | **fails the pre-set criterion** (below) |
-| is the information there at all? | `id_to_latent_probe.py` | **yes**: 0.96-0.98 from a ~1-period window of Id |
-| option 2: Id as a latent coordinate | not implemented | design below |
+| option 1: 4-channel RC, Id-driven infer | `rc_with_id.py`, `rc_seed_sweep.py` | **fails** the criterion: mean inferPC 0.54 over 20 runs |
+| is the information there? | `id_to_latent_probe.py` | **yes**: 0.96-0.98 from a ~1-period window of Id |
+| **approach A: windowed observer** | `id_observer.py`, `src/observer.py` | **works**: inferPC 0.97, decoded error 0.46x persistence |
+| **approach B / option 2: Id in the AE** | `train_ae_id.py`, `run_id_variants.py`, `evaluate_id_variants.py` | implemented and evaluated (11 AEs); **not recommended** |
+| write-up | `build_report_id.py` -> `report_id.html` | companion to `report.html` |
 
-## Option 1 - 4-channel reservoir, AE untouched
+**Recommendation: use the windowed observer with the existing autoencoder.**
+
+### Approach A - the windowed observer (built)
+
+A causal regression Id(t), Id(t-5), ..., Id(t-150) -> latent(t) (`src/observer.py`, MLP of
+two 128-unit tanh layers, three fits averaged, fit on the first 17,000 frames only).
+Held-out (frames 17,001-20,000):
+
+- latent inferPC 0.979 / 0.964 / 0.958; decoded field error 0.457x a persistence forecast,
+  the same as the z1-driven reservoir (0.457x), which needs an unmeasurable latent;
+- window length matters more than model class: 50 steps -> PC ~0.8, 150-300 steps -> ~0.97;
+  ridge at 150 steps -> ~0.81, so the map is nonlinear;
+- robust to measurement noise: 5% of Id's std costs nothing (PC 0.967 -> 0.965), 20% -> 0.927
+  (0.935 if trained with 5% noise);
+- works equally on every autoencoder tried (free-coordinate PC 0.965-0.972 controls,
+  0.965-0.971 Id-tied).
+
+Limits: fit on one simulation at one operating point; needs one breathing period (7.5 us)
+of history before it can estimate the state.
+
+### Approach B / option 2 - results (implemented)
+
+`train_ae_id.py` follows the production two-stage recipe exactly, so `--id-mode none` is a
+same-machine control (3 seeds, plus the original AE, form the spread). 11 AEs: controls,
+supervised (lambda 0.1/1/10 x mu 0/0.1) and conditional (mu 0/0.1). Scored by
+`evaluate_id_variants.py` into `id_study/summary.json` (5 reservoir seeds per configuration).
+
+| finding | numbers |
+|---|---|
+| reconstruction costs nothing | val MSE 0.0211-0.0214 everywhere; mean field error 8.3-8.5% vs 8.5-8.7% controls (a 0.2-0.4 pt edge for supervised mu=0 is suggestive only, n=4 controls) |
+| the third coordinate tracks Id | supervised R² 0.993-0.996 at every lambda incl. 0.1; conditional exact |
+| decorrelation removes the *linear* leakage only | linear R² of Id from (z1,z2): 0.11-0.15 controls -> ~0 with mu=0.1; MLP R²: 0.18-0.22 controls, 0.30-0.33 supervised mu=0, 0.20-0.24 with mu, 0.14-0.28 conditional |
+| the reservoir does **worse** on Id-tied latents | z1-driven inferPC 0.95-0.96 (controls) -> 0.35-0.69 (mu=0) and 0.04-0.86 (mu=0.1); the penalty lowered it in 3/4 matched pairs (4/4 for Id-driven) |
+| Id-driven infer is not repaired | 0.53-0.73 without the penalty (mean 0.66) vs option 1's 0.54 |
+| the observer is unaffected | free-coordinate PC 0.965-0.972 vs 0.965-0.971 |
+
+Why leakage persists is expected: Id is a function of the plasma state, and on a nearly
+1-D limit cycle any two coordinates that locate the state on the loop also determine Id
+nonlinearly. Why the reservoir degrades is **not established**: noise carried in from Id is
+not supported (the third coordinate's high-frequency share is 0.058-0.059 vs 0.068-0.089 for
+controls); untested candidate: the latent trajectory's shape changes. The reservoir was not
+re-tuned, but the retrained controls use the same settings and are fine.
+
+Answering the open question below: making Id a coordinate does **not** make the other
+coordinates easier to infer from Id's history.
+
+Note: `val_decorr` in the `train_history.json` / `config.json` of the eleven runs trained
+before the logging fix was computed on contiguous 64-step slices and is inflated by slow
+trends; ignore it (the training-side value and the held-out leakage R² are the real
+measures). Later runs shuffle the validation batches with a separate generator.
+
+## Option 1 - 4-channel reservoir, AE untouched (built; superseded by approach A)
 
 State `[z1, z2, z3, Id]`, every channel z-scored on the train block only. Infer mode
 observes only the drive channel and reconstructs the rest. Success criterion, fixed
@@ -67,18 +120,19 @@ history recovers it well. This is the Takens picture: a scalar observable of a
 that history implicitly, but `Reservoir.infer()` trains the readout with every
 channel driven and then feeds back its own estimates for the undriven ones, which
 is the same exposure-bias mismatch seen in the MLP and delay-embedding readout
-experiments. Id is also a high-frequency, noisy drive.
+experiments.
 
-### Next steps, cheapest first
-1. **Windowed observer**: a direct Id-window -> z regression (already R² ~0.96) as
-   the tracker, with no reservoir in the loop.
-2. **Delay-embedding readout on the RC** (precedent: `delay_embedding_readout.py`):
-   give the readout a window of reservoir states while Id-driven.
-3. **Observer-mode reservoir**: drive with Id only and fit the readout for exactly
-   that regime. Needs input/output dimensions to differ, which `Reservoir` does not
+### Remaining ideas (not tried)
+1. ~~Windowed observer~~ - built, see approach A above.
+2. **Delay-embedding readout on the RC** (precedent: `delay_embedding_readout.py`): give
+   the readout a window of reservoir states while Id-driven, keeping the reservoir.
+3. **Observer-mode reservoir**: drive with Id only and fit the readout for exactly that
+   regime. Needs input and output dimensions to differ, which `Reservoir` does not
    currently allow (input `D` = output `D`).
+4. Re-tune the reservoir on the Id-tied latents, and test what makes it degrade there
+   (trajectory geometry is the untested candidate).
 
-## Option 2 - Id as one of the three latent coordinates (design, not built)
+## Option 2 - Id as one of the three latent coordinates (design; built, see results above)
 
 The decoder always receives a 3-vector `[a, b, c]`. Option 2 makes `c` correspond to
 Id so the encoder's two free coordinates are trained to encode what Id does not.
@@ -146,7 +200,7 @@ time (Id from a latent window, R² 0.94), and the RC learns exactly that couplin
   vs `latent3/err_summary_full.json`, z3-vs-Id R², leakage R², and RC Id-driven
   inferPC over seeds, head to head with option 1.
 
-### Open question option 1 raised
+### Open question option 1 raised (answered: no, see results above)
 
 Making Id a coordinate does not by itself remove the observability problem: the
 other two coordinates must still be inferred from Id's *history*, and instantaneous

@@ -121,7 +121,7 @@ def fig_observer_timeseries(n=700):
         axs[k].plot(t, (z_obs[:n, k] - zn_mean[k]) / zn_std[k], color=TEAL, lw=1.2, label="window observer")
         axs[k].plot(t, rc["y_infer"][k, :n], color=RUST, lw=1.0, alpha=0.8, label="reservoir, Id-driven (seed 0)")
         axs[k].set_ylabel(f"z{k + 1}")
-    axs[0].legend(ncol=3, loc="upper right", fontsize=8.5, frameon=False)
+    axs[0].legend(ncol=3, loc="lower center", bbox_to_anchor=(0.5, 1.0), fontsize=8.5, frameon=False)
     axs[-1].set_xlabel("step into held-out block (50 ns/step)")
     fig.tight_layout()
     return fig
@@ -143,6 +143,7 @@ def fig_field_errors(summary):
     ax.set_xticks(x)
     ax.set_xticklabels([FIELD_TEX[f] for f in FIELD_NAMES])
     ax.set_ylabel("mean relative error (%)")
+    ax.set_ylim(0, 1.32 * max(obs["persistence"].values()))
     ax.legend(ncol=3, fontsize=8.5, frameon=False, loc="upper left")
     fig.tight_layout()
     return fig
@@ -190,6 +191,17 @@ def pretty(v):
     return f"cond\n$\\mu$={v.split('_d')[1]}"
 
 
+def pretty_short(v):
+    if v == "baseline":
+        return "prod."
+    if v.startswith("ctrl"):
+        return f"ctrl\ns{v[-1]}"
+    if v.startswith("sup"):
+        lam, mu = v.split("_w")[1].split("_d")
+        return f"sup\n$\\lambda${lam}\n$\\mu${mu}"
+    return f"cond\n$\\mu${v.split('_d')[1]}"
+
+
 def fig_option2_overview(summary):
     order = _order(summary)
     x = np.arange(len(order))
@@ -199,7 +211,7 @@ def fig_option2_overview(summary):
     ctrl_err = [summary[v]["static"]["mean_field_error_pct_all_frames"] for v in order if _color(v) == GRAY]
     axs[0].bar(x, err, color=col)
     axs[0].axhspan(min(ctrl_err), max(ctrl_err), color=GRAY, alpha=0.18, zorder=0)
-    axs[0].set_ylim(min(err) * 0.95, max(err) * 1.03)
+    axs[0].set_ylim(0, max(err) * 1.25)          # full scale from zero: the differences are small and should look it
     axs[0].set_ylabel("mean decoded field\nerror, all frames (%)")
     axs[0].set_title("Reconstruction cost (shaded: spread of the four controls)", fontsize=10, color=GRAY, loc="left")
 
@@ -227,7 +239,7 @@ def fig_option2_rc(summary):
     order = [v for v in _order(summary) if "rc" in summary[v]]
     x = np.arange(len(order))
     col = [_color(v) for v in order]
-    fig, axs = plt.subplots(1, 2, figsize=(10.5, 4.3), sharey=True)
+    fig, axs = plt.subplots(1, 2, figsize=(12, 4.4), sharey=True)
     m1 = [np.mean(summary[v]["rc"]["z1drive"]["pc_mean"]) for v in order]
     s1 = [np.mean(summary[v]["rc"]["z1drive"]["pc_std"]) for v in order]
     axs[0].bar(x, m1, yerr=s1, color=col, capsize=3, ecolor=INK)
@@ -238,13 +250,13 @@ def fig_option2_rc(summary):
     s3 = [np.mean(summary[v]["rc"]["z3drive"]["pc_std"]) for v in idv]
     axs[1].bar(xi, m3, yerr=s3, color=[_color(v) for v in idv], capsize=3, ecolor=INK)
     ctrl_id = np.mean([np.mean(summary[v]["rc"]["id4drive"]["pc_mean"]) for v in order if "id4drive" in summary[v]["rc"]])
-    axs[1].axhline(ctrl_id, color=GRAY, ls="--", lw=1.2)
-    axs[1].text(len(idv) - 0.6, ctrl_id + 0.02, "option 1: Id as a 4th channel", ha="right", fontsize=8.5, color=GRAY)
+    axs[1].axhline(ctrl_id, color=INK, ls="--", lw=1.2, label="option 1: Id as a 4th channel (mean over controls)")
+    axs[1].legend(loc="upper right", frameon=True, facecolor="white", edgecolor="none", fontsize=8.5)
     axs[1].set_title("driven by Id (z3 is Id)", fontsize=10, color=GRAY, loc="left")
     axs[0].set_xticks(x)
-    axs[0].set_xticklabels([pretty(v) for v in order], fontsize=7.6)
+    axs[0].set_xticklabels([pretty_short(v) for v in order], fontsize=8)
     axs[1].set_xticks(xi)
-    axs[1].set_xticklabels([pretty(v) for v in idv], fontsize=7.6)
+    axs[1].set_xticklabels([pretty_short(v) for v in idv], fontsize=8)
     axs[0].set_ylabel("held-out inferPC, mean over scored channels\n(error bar: std over reservoir seeds)")
     axs[0].set_ylim(0, 1.05)
     fig.tight_layout()
@@ -255,18 +267,18 @@ def fig_option2_observer(summary):
     order = [v for v in _order(summary) if "observer" in summary[v]]
     x = np.arange(len(order))
     col = [_color(v) for v in order]
-    fig, axs = plt.subplots(1, 2, figsize=(10.5, 4.0))
-    axs[0].bar(x, [np.mean([c["pc"] for c in summary[v]["observer"]["per_channel"].values()]) for v in order], color=col)
-    axs[0].set_ylim(0.85, 1.0)
-    axs[0].set_ylabel("mean latent PC")
-    axs[0].set_title("window observer: latent recovered from Id", fontsize=10, color=GRAY, loc="left")
+    fig, axs = plt.subplots(1, 2, figsize=(12, 4.0))
+    axs[0].bar(x, [np.mean([summary[v]["observer"]["per_channel"][k]["pc"] for k in ("z1", "z2")]) for v in order], color=col)
+    axs[0].set_ylim(0, 1.0)
+    axs[0].set_ylabel("mean PC of z1, z2")
+    axs[0].set_title("window observer: free latents recovered from Id", fontsize=10, color=GRAY, loc="left")
     ratio = [np.mean(list(summary[v]["observer"]["ratio_to_persistence_full"].values())) for v in order]
     axs[1].bar(x, ratio, color=col)
     axs[1].set_ylabel("mean decoded error / persistence")
     axs[1].set_title("decoded fields (lower is better)", fontsize=10, color=GRAY, loc="left")
     for a in axs:
         a.set_xticks(x)
-        a.set_xticklabels([pretty(v) for v in order], fontsize=7.6)
+        a.set_xticklabels([pretty_short(v) for v in order], fontsize=8)
     fig.tight_layout()
     return fig
 
