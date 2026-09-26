@@ -1,0 +1,17 @@
+# Checks run inside the pipeline's worker image (Debian, Python 3), from the repo root.
+# CPU-only torch: the default PyPI wheel pulls several GB of CUDA libraries on every job.
+setup: "python3 -m venv /tmp/venv && /tmp/venv/bin/pip install --quiet --index-url https://download.pytorch.org/whl/cpu torch && /tmp/venv/bin/pip install --quiet numpy scipy pytest"
+fast_check: "/tmp/venv/bin/python -m pytest -q -p no:cacheprovider"
+full_check: "/tmp/venv/bin/python -m pytest -q -p no:cacheprovider"
+
+paths:
+  tests:
+    - "tests/**"
+  docs:
+    - "README.md"
+    - "HPHall-data-Summer24/scripts/*.md"
+  manual_merge:
+    - "pipeline.yml"
+    - "AGENTS.md"
+    - "CLAUDE.md"
+    - "WORKFLOW.md"
