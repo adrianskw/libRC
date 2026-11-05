@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-libRC: a reservoir computing and autoencoder pipeline research framework.
+libRC: a reservoir computing research library.
 
-This package (folder name `src`) covers both halves of the pipeline: the
-reservoir-computing core (`reservoir.py`, `connectivity.py`,
-`integrators.py`) and the convolutional autoencoder used to compress
-simulation frames into the latent trajectories the reservoir is trained on
-(`autoencoder.py`).
+The package (folder name `src`) holds the reservoir-computing core
+(`reservoir.py`, `connectivity.py`, `integrators.py`) and evaluation metrics
+(`metrics.py`).
 
 ##  Glossary ##
     # Reservoir Parameters
@@ -56,16 +54,8 @@ simulation frames into the latent trajectories the reservoir is trained on
 @author: Adrian Wong
 """
 from .reservoir import Reservoir, mapRC, diffRC
-from .autoencoder import (ConvAE, save_checkpoint, load_checkpoint,
-                          decode_to_fields, relative_field_error, id_loss_terms)
 from . import connectivity
 from . import integrators
-from . import observables
-from . import observer
+from . import metrics
 
-__all__ = [
-    "Reservoir", "mapRC", "diffRC",
-    "ConvAE", "save_checkpoint", "load_checkpoint",
-    "decode_to_fields", "relative_field_error", "id_loss_terms",
-    "connectivity", "integrators", "observables", "observer",
-]
+__all__ = ["Reservoir", "mapRC", "diffRC", "connectivity", "integrators", "metrics"]

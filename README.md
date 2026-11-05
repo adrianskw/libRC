@@ -1,10 +1,8 @@
 # libRC
 
-A reservoir-computing and autoencoder pipeline research framework.
+A reservoir-computing research library.
 
 The importable package lives in [`src/`](src/): the reservoir-computing core
-(`reservoir.py`, `connectivity.py`, `integrators.py`) and the convolutional
-autoencoder (`autoencoder.py`) used to compress simulation frames into the
-latent trajectories the reservoir is trained on. Research, sweep, and
-data-pipeline scripts that use `src` live under
-[`sim-data/scripts/`](sim-data/scripts/).
+(`reservoir.py`, `connectivity.py`, `integrators.py`) and evaluation metrics
+(`metrics.py`). Worked examples are in [`example/`](example/) and the tests in
+[`tests/`](tests/) (`python -m pytest -q tests`).

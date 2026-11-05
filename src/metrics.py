@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Metrics shared by the report builders and experiment scripts, matching the definitions in
-the first report (build_report.py): the reservoir's "inferPC" and the breathing-mode period.
+Reservoir evaluation metrics: "inferPC" (squared correlation of inferred and true channels)
+and the period of an oscillating channel.
 
 @author: Adrian Wong
 """
@@ -11,7 +11,7 @@ import numpy as np
 def infer_pc(y_true, y_pred):
     """Squared correlation between each true channel and each predicted one (channels x time).
 
-    The diagonal is the per-channel "PC" quoted in the report; it is invariant to the scale
+    The diagonal is the per-channel "PC"; it is invariant to the scale
     and offset of the prediction, so it measures shape, not amplitude.
     """
     yy = y_true - y_true.mean(axis=1, keepdims=True)
@@ -20,7 +20,7 @@ def infer_pc(y_true, y_pred):
 
 
 def period_steps(z1, distance=100, win=41):
-    """Median spacing (in steps) between breathing-mode peaks of a latent channel, and the peak count.
+    """Median spacing (in steps) between oscillation peaks of a channel, and the peak count.
 
     The slow trend is removed with a moving average first. A signal with no oscillation
     (e.g. a reservoir that collapsed to a fixed point) yields (nan, n_peaks < 2).
